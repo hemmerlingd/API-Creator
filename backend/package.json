@@ -1,0 +1,22 @@
+{
+  "name": "api-generator-backend",
+  "version": "1.0.0",
+  "description": "Backend service to analyze database schemas and generate code.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "api",
+    "generator",
+    "low-code"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "mysql2": "^3.6.5"
+  }
+}

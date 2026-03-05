@@ -1,0 +1,262 @@
+<main class="container">
+  <header>
+    <h1>Creador de APIs PHP</h1>
+    <p>
+      Paso 1: Conéctate a tu base de datos MySQL para analizar su estructura.
+    </p>
+  </header>
+
+  <section
+    class="form-section w-100 border border-1 p-4 p-md-5 rounded shadow-sm"
+  >
+    <form [formGroup]="dbForm" (ngSubmit)="onSubmit()" novalidate>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="host" class="form-label">Host</label>
+          <input
+            id="host"
+            type="text"
+            formControlName="host"
+            class="form-control"
+          />
+        </div>
+        <div class="col-md-6">
+          <label for="port" class="form-label">Puerto</label>
+          <input
+            id="port"
+            type="number"
+            formControlName="port"
+            class="form-control"
+          />
+        </div>
+        <div class="col-md-6">
+          <label for="user" class="form-label">Usuario</label>
+          <input
+            id="user"
+            type="text"
+            formControlName="user"
+            class="form-control"
+          />
+        </div>
+        <div class="col-md-6">
+          <label for="pass" class="form-label">Contraseña</label>
+          <input
+            id="pass"
+            type="password"
+            formControlName="pass"
+            placeholder="(opcional)"
+            class="form-control"
+          />
+        </div>
+        <div class="col-12">
+          <label for="dbName" class="form-label"
+            >Nombre de la Base de Datos</label
+          >
+          <input
+            id="dbName"
+            type="text"
+            formControlName="dbName"
+            class="form-control"
+            [class.is-invalid]="
+              dbForm.get('dbName')?.invalid && dbForm.get('dbName')?.touched
+            "
+          />
+          <div
+            *ngIf="
+              dbForm.get('dbName')?.invalid && dbForm.get('dbName')?.touched
+            "
+            class="invalid-feedback"
+          >
+            El nombre de la base de datos es requerido.
+          </div>
+        </div>
+      </div>
+
+      <button
+        class="btn btn-primary w-100 mt-4"
+        type="submit"
+        [disabled]="isLoading"
+      >
+        <span
+          *ngIf="isLoading"
+          class="spinner-border spinner-border-sm me-2"
+          role="status"
+          aria-hidden="true"
+        ></span>
+        {{ isLoading ? "Analizando..." : "Analizar Base de Datos" }}
+      </button>
+    </form>
+  </section>
+
+  <!-- Sección de Resultados -->
+  <section *ngIf="apiResponse" class="results-section mt-4">
+    <div
+      *ngIf="apiResponse.success; else errorBlock"
+      class="alert alert-success"
+    >
+      <h4 class="alert-heading">¡Conexión Exitosa!</h4>
+      <p>
+        Se encontraron
+        <strong>{{ tableNames.length }}</strong> tablas en la base de datos '{{
+          dbForm.get("dbName")?.value
+        }}'.
+      </p>
+      <hr *ngIf="tableNames.length > 0" />
+      <div *ngIf="tableNames.length > 0">
+        <p class="mb-2">
+          Paso 2: Selecciona las operaciones CRUD para cada tabla.
+        </p>
+        <form [formGroup]="selectionForm">
+          <ul class="list-group">
+            <li
+              *ngFor="let table of tableNames; index as i"
+              class="list-group-item"
+              [formGroupName]="table"
+            >
+              <div
+                *ngIf="onCreate(progressBar) > 0"
+                class="progress"
+                role="progressbar"
+                aria-label="Success Animated striped"
+                [attr.aria-valuenow]="onCreate(progressBar)"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <div
+                  class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                  [style.width.%]="onCreate(progressBar)"
+                >
+                  {{ onCreate(progressBar) }}%
+                </div>
+              </div>
+              <div
+                class="checks d-flex flex-wrap justify-content-between align-items-center"
+                [ngClass]="{ 'list-group-item-light': i % 2 !== 0 }"
+              >
+                <div class="form-check form-check-inline">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="{{ table }}-all"
+                    formControlName="all"
+                    (change)="onAllChange($event, table)"
+                  />
+                  <label
+                    class="form-check-label fw-bold me-3 mb-2 mb-md-0"
+                    for="{{ table }}-all"
+                    >{{ table }} </label
+                  ><small
+                    class="text-muted text-info"
+                    style="cursor: pointer"
+                    (click)="toggleSchema(table)"
+                    >{{
+                      isSchemaExpanded(table)
+                        ? "(ocultar tabla)"
+                        : "(ver tabla)"
+                    }}</small
+                  >
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center">
+                  <div
+                    class="form-check form-check-inline d-flex align-items-center justify-content-around"
+                  >
+                    <input
+                      class="form-check-input align-middle"
+                      type="checkbox"
+                      id="{{ table }}-read"
+                      formControlName="read"
+                      (change)="onCrudChange(table)"
+                    />
+                    <label
+                      class="form-check-label ms-2 lh-1"
+                      for="{{ table }}-read"
+                      >Leer Todos <br />
+                      Leer Uno</label
+                    >
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="{{ table }}-create"
+                      formControlName="create"
+                      (change)="onCrudChange(table)"
+                    />
+                    <label class="form-check-label" for="{{ table }}-create"
+                      >Crear</label
+                    >
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="{{ table }}-update"
+                      formControlName="update"
+                      (change)="onCrudChange(table)"
+                    />
+                    <label class="form-check-label" for="{{ table }}-update"
+                      >Actualizar</label
+                    >
+                  </div>
+                  <div class="form-check form-check-inline">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="{{ table }}-delete"
+                      formControlName="delete"
+                      (change)="onCrudChange(table)"
+                    />
+                    <label class="form-check-label" for="{{ table }}-delete"
+                      >Eliminar</label
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- Esquema de la tabla -->
+              <div class="schema w-100 mt-3" *ngIf="isSchemaExpanded(table)">
+                <div class="table-responsive">
+                  <table
+                    class="table table-sm table-bordered table-striped mb-0"
+                    style="font-size: 0.85rem"
+                  >
+                    <thead class="table-light">
+                      <tr>
+                        <th>Field</th>
+                        <th>Type</th>
+                        <th>Null</th>
+                        <th>Key</th>
+                        <th>Default</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr *ngFor="let col of apiResponse.schema?.[table]">
+                        <td>{{ col.Field }}</td>
+                        <td>{{ col.Type }}</td>
+                        <td>{{ col.Null }}</td>
+                        <td>{{ col.Key }}</td>
+                        <td>{{ col.Default }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </li>
+          </ul>
+        </form>
+      </div>
+    </div>
+
+    <ng-template #errorBlock>
+      <div class="alert alert-danger">
+        <h4 class="alert-heading">Error de Conexión</h4>
+        <p>{{ apiResponse.message || "Ocurrió un error inesperado." }}</p>
+        <hr *ngIf="apiResponse.error" />
+        <small *ngIf="apiResponse.error"
+          >Código de error: {{ apiResponse.error }}</small
+        >
+      </div>
+    </ng-template>
+  </section>
+</main>
