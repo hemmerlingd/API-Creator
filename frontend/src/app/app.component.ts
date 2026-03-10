@@ -3,6 +3,7 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import {
   ApiGeneratorService,
   ApiResponse,
+  Progreso,
 } from './services/api-generator.service';
 import { finalize } from 'rxjs/operators';
 
@@ -16,7 +17,8 @@ export class AppComponent implements OnInit {
   selectionForm: FormGroup; // Nuevo FormGroup para los checkboxes
   isLoading = false;
   apiResponse: ApiResponse | null = null;
-  progressBar: number = 0;
+  progressBar: Progreso;
+
   expandedSchemas: Set<string> = new Set();
 
   constructor(
@@ -38,6 +40,7 @@ export class AppComponent implements OnInit {
     });
     // Inicializamos el nuevo form group
     this.selectionForm = this.fb.group({});
+    this.progressBar = { table: 'especies', porcentaje: 28 };
   }
 
   onSubmit(): void {
@@ -130,8 +133,10 @@ export class AppComponent implements OnInit {
     return this.expandedSchemas.has(table);
   }
 
-  onCreate(i: number): number {
-    // this.progressBar = i;
+  onCreate(i: string): Progreso {
+    let j: Progreso = { table: i, porcentaje: 28 };
+    this.progressBar = j;
+
     return this.progressBar;
   }
 

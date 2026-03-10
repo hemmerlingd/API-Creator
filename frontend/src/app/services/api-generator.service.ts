@@ -17,6 +17,11 @@ export interface ApiResponse {
   error?: string;
 }
 
+export interface Progreso {
+  table: string;
+  porcentaje: number;  
+}
+
 @Injectable({
   providedIn: 'root',
 })

@@ -103,9 +103,20 @@
       </p>
       <hr *ngIf="tableNames.length > 0" />
       <div *ngIf="tableNames.length > 0">
-        <p class="mb-2">
-          Paso 2: Selecciona las operaciones CRUD para cada tabla.
-        </p>
+        <div
+          class="w-100 my-3 d-flex justify-content-between align-items-center"
+        >
+          <p class="mb-2">
+            Paso 2: Selecciona las operaciones CRUD para cada tabla.
+          </p>
+          <div class="actions">
+            <button class="btn btn-success" (click)="onCreate('alumbrado')">
+              Crear API
+            </button>
+            <button class="btn btn-danger mx-2">Cancelar</button>
+          </div>
+        </div>
+
         <form [formGroup]="selectionForm">
           <ul class="list-group">
             <li
@@ -113,22 +124,7 @@
               class="list-group-item"
               [formGroupName]="table"
             >
-              <div
-                *ngIf="onCreate(progressBar) > 0"
-                class="progress"
-                role="progressbar"
-                aria-label="Success Animated striped"
-                [attr.aria-valuenow]="onCreate(progressBar)"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
-                <div
-                  class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                  [style.width.%]="onCreate(progressBar)"
-                >
-                  {{ onCreate(progressBar) }}%
-                </div>
-              </div>
+
               <div
                 class="checks d-flex flex-wrap justify-content-between align-items-center"
                 [ngClass]="{ 'list-group-item-light': i % 2 !== 0 }"
@@ -242,9 +238,29 @@
                   </table>
                 </div>
               </div>
+              <div
+                *ngIf="progressBar.porcentaje > 0 && progressBar.table == table"
+                class="progress"
+                role="progressbar"
+                aria-label="Success Animated striped"
+                [attr.aria-valuenow]="progressBar.porcentaje"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <div
+                  class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                  [style.width.%]="progressBar.porcentaje"
+                >
+                  {{ progressBar.porcentaje }}%
+                </div>
+              </div>
             </li>
           </ul>
         </form>
+      </div>
+      <div class="w-100 my-3 d-flex justify-content-end align-items-center">
+        <button class="btn btn-success" (click)="onCreate('alumbrado')">Crear API</button>
+        <button class="btn btn-danger mx-2">Cancelar</button>
       </div>
     </div>
 
