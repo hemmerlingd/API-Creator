@@ -47,6 +47,8 @@ export class ApiGeneratorService {
     schema: any,
     dbConfig: DbCredentials,
   ): Observable<any> {
+    console.log(tables, schema, dbConfig);
+    
     return this.http.post(`${this.backendUrl}/generate-api`, {
       tables,
       schema,

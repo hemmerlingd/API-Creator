@@ -163,4 +163,7 @@ export class AppComponent implements OnInit {
   get tableNames(): string[] {
     return this.apiResponse?.schema ? Object.keys(this.apiResponse.schema) : [];
   }
+  copy(){
+    navigator.clipboard.writeText(this.generatedApiCode || '');
+  }
 }
