@@ -129,15 +129,35 @@ export class AppComponent implements OnInit {
     }
   }
 
+  generatedApiCode: string | null = null;
+
   isSchemaExpanded(table: string): boolean {
     return this.expandedSchemas.has(table);
   }
 
-  onCreate(i: string): Progreso {
-    let j: Progreso = { table: i, porcentaje: 28 };
-    this.progressBar = j;
+  onGenerateApi(): void {
+    const selectedTables = this.selectionForm.value;
+    const schema = this.apiResponse?.schema;
+    const dbConfig = this.dbForm.value;
 
-    return this.progressBar;
+    if (!schema) {
+      console.error('Schema is not available.');
+      return;
+    }
+
+    this.apiService.generateApi(selectedTables, schema, dbConfig).subscribe({
+      next: (response) => {
+        if (response.success) {
+          this.generatedApiCode = response.generatedApi;
+          console.log('API generated successfully:', this.generatedApiCode);
+        } else {
+          console.error('API generation failed:', response.message);
+        }
+      },
+      error: (err) => {
+        console.error('Error during API generation:', err);
+      },
+    });
   }
 
   get tableNames(): string[] {

@@ -3,7 +3,7 @@ const mysql = require("mysql2/promise"); // Usamos la versión con promesas
 const cors = require("cors");
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 // --- Middlewares ---
 // Habilita CORS para permitir peticiones desde el frontend de Angular (que corre en otro puerto)

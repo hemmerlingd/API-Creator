@@ -19,14 +19,14 @@ export interface ApiResponse {
 
 export interface Progreso {
   table: string;
-  porcentaje: number;  
+  porcentaje: number;
 }
 
 @Injectable({
   providedIn: 'root',
 })
 export class ApiGeneratorService {
-  private readonly backendUrl = 'http://localhost:3000/api';
+  private readonly backendUrl = 'http://localhost:3001/api';
 
   constructor(private http: HttpClient) {}
 
@@ -40,5 +40,17 @@ export class ApiGeneratorService {
       `${this.backendUrl}/analyze-schema`,
       credentials,
     );
+  }
+
+  generateApi(
+    tables: any,
+    schema: any,
+    dbConfig: DbCredentials,
+  ): Observable<any> {
+    return this.http.post(`${this.backendUrl}/generate-api`, {
+      tables,
+      schema,
+      dbConfig,
+    });
   }
 }

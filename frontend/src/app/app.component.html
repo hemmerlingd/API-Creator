@@ -110,7 +110,7 @@
             Paso 2: Selecciona las operaciones CRUD para cada tabla.
           </p>
           <div class="actions">
-            <button class="btn btn-success" (click)="onCreate('alumbrado')">
+            <button class="btn btn-success" (click)="onGenerateApi()">
               Crear API
             </button>
             <button class="btn btn-danger mx-2">Cancelar</button>
@@ -259,7 +259,7 @@
         </form>
       </div>
       <div class="w-100 my-3 d-flex justify-content-end align-items-center">
-        <button class="btn btn-success" (click)="onCreate('alumbrado')">Crear API</button>
+        <button class="btn btn-success" (click)="onGenerateApi()">Crear API</button>
         <button class="btn btn-danger mx-2">Cancelar</button>
       </div>
     </div>
@@ -274,5 +274,17 @@
         >
       </div>
     </ng-template>
+  </section>
+
+  <!-- Display Generated API Code -->
+  <section *ngIf="generatedApiCode" class="generated-api-section mt-4">
+    <div class="card">
+      <div class="card-header">
+        <h4>API Generada</h4>
+      </div>
+      <div class="card-body">
+        <pre><code>{{ generatedApiCode }}</code></pre>
+      </div>
+    </div>
   </section>
 </main>
