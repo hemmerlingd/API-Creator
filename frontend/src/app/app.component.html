@@ -280,7 +280,7 @@
   <section *ngIf="generatedApiCode" class="generated-api-section mt-4">
     <div class="card">
       <div class="card-header">
-        <h4>API Generada</h4>
+        <h4>API Generada <span (click)="copy()">📄 COPY TO CLIPBOARD</span></h4>
       </div>
       <div class="card-body">
         <pre><code>{{ generatedApiCode }}</code></pre>

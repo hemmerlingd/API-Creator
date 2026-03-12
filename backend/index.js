@@ -106,8 +106,11 @@ function generateApiCode(tables, schema, dbConfig) {
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+<<<<<<< HEAD
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = 'tu_clave_secreta_super_segura';
+=======
+>>>>>>> 697f67be31eabc8696455f04d7b8bf13a66e6864
 
 const app = express();
 const port = 3002;
@@ -126,6 +129,7 @@ const dbConfig = {
 async function getConnection() {
   return await mysql.createConnection(dbConfig);
 }
+<<<<<<< HEAD
   // --- Middleware de Seguridad ---
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -152,6 +156,8 @@ app.post('/api/login', async (req, res) => {
     res.status(400).json({ message: 'Usuario requerido' });
   }
 });
+=======
+>>>>>>> 697f67be31eabc8696455f04d7b8bf13a66e6864
 `);
 
   for (const table in tables) {
