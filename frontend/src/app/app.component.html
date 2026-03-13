@@ -1,6 +1,6 @@
 <main class="container">
   <header>
-    <h1>Creador de APIs PHP</h1>
+    <h1>Creador de APIs Node.js + MySQL</h1>
     <p>
       Paso 1: Conéctate a tu base de datos MySQL para analizar su estructura.
     </p>
@@ -96,35 +96,21 @@
     >
       <h4 class="alert-heading">¡Conexión Exitosa!</h4>
       <p>
-        Se encontraron
-        <strong>{{ tableNames.length }}</strong> tablas en la base de datos '{{
-          dbForm.get("dbName")?.value
-        }}'.
+        Se encontraron <strong>{{ tableNames.length }}</strong> tablas en la
+        base de datos '{{ dbForm.get("dbName")?.value }}'.
       </p>
       <hr *ngIf="tableNames.length > 0" />
-      <div *ngIf="tableNames.length > 0">
-        <div
-          class="w-100 my-3 d-flex justify-content-between align-items-center"
-        >
-          <p class="mb-2">
-            Paso 2: Selecciona las operaciones CRUD para cada tabla.
-          </p>
-          <div class="actions">
-            <button class="btn btn-success" (click)="onGenerateApi()">
-              Crear API
-            </button>
-            <button class="btn btn-danger mx-2">Cancelar</button>
-          </div>
-        </div>
 
-        <form [formGroup]="selectionForm">
+      <!-- Paso 2: Selección de Tablas y CRUDs -->
+      <div *ngIf="tableNames.length > 0">
+        <h4>Paso 2: Selecciona las operaciones CRUD para cada tabla</h4>
+        <form [formGroup]="selectionForm" class="mt-3">
           <ul class="list-group">
             <li
               *ngFor="let table of tableNames; index as i"
               class="list-group-item"
               [formGroupName]="table"
             >
-
               <div
                 class="checks d-flex flex-wrap justify-content-between align-items-center"
                 [ngClass]="{ 'list-group-item-light': i % 2 !== 0 }"
@@ -138,37 +124,35 @@
                     (change)="onAllChange($event, table)"
                   />
                   <label
-                    class="form-check-label fw-bold me-3 mb-2 mb-md-0"
+                    class="form-check-label fw-bold me-2 mb-2 mb-md-0"
                     for="{{ table }}-all"
-                    >{{ table }} </label
-                  ><small
-                    class="text-muted text-info"
+                    >{{ table }}</label
+                  >
+                  <small
+                    class="text-primary"
                     style="cursor: pointer"
                     (click)="toggleSchema(table)"
-                    >{{
-                      isSchemaExpanded(table)
-                        ? "(ocultar tabla)"
-                        : "(ver tabla)"
-                    }}</small
                   >
+                    {{
+                      isSchemaExpanded(table)
+                        ? "(ocultar esquema)"
+                        : "(ver esquema)"
+                    }}
+                  </small>
                 </div>
 
                 <div class="d-flex flex-wrap align-items-center">
-                  <div
-                    class="form-check form-check-inline d-flex align-items-center justify-content-around"
-                  >
+                  <!-- Checkboxes para Read, Create, Update, Delete -->
+                  <div class="form-check form-check-inline">
                     <input
-                      class="form-check-input align-middle"
+                      class="form-check-input"
                       type="checkbox"
                       id="{{ table }}-read"
                       formControlName="read"
                       (change)="onCrudChange(table)"
                     />
-                    <label
-                      class="form-check-label ms-2 lh-1"
-                      for="{{ table }}-read"
-                      >Leer Todos <br />
-                      Leer Uno</label
+                    <label class="form-check-label" for="{{ table }}-read"
+                      >Leer</label
                     >
                   </div>
                   <div class="form-check form-check-inline">
@@ -210,8 +194,8 @@
                 </div>
               </div>
 
-              <!-- Esquema de la tabla -->
-              <div class="schema w-100 mt-3" *ngIf="isSchemaExpanded(table)">
+              <!-- Esquema de la tabla (colapsable) -->
+              <div class="w-100 mt-3" *ngIf="isSchemaExpanded(table)">
                 <div class="table-responsive">
                   <table
                     class="table table-sm table-bordered table-striped mb-0"
@@ -238,29 +222,147 @@
                   </table>
                 </div>
               </div>
-              <div
-                *ngIf="progressBar.porcentaje > 0 && progressBar.table == table"
-                class="progress"
-                role="progressbar"
-                aria-label="Success Animated striped"
-                [attr.aria-valuenow]="progressBar.porcentaje"
-                aria-valuemin="0"
-                aria-valuemax="100"
-              >
-                <div
-                  class="progress-bar progress-bar-striped progress-bar-animated bg-success"
-                  [style.width.%]="progressBar.porcentaje"
-                >
-                  {{ progressBar.porcentaje }}%
-                </div>
-              </div>
             </li>
           </ul>
         </form>
       </div>
-      <div class="w-100 my-3 d-flex justify-content-end align-items-center">
-        <button class="btn btn-success" (click)="onGenerateApi()">Crear API</button>
-        <button class="btn btn-danger mx-2">Cancelar</button>
+
+      <!-- Paso 3: Gestión de Usuarios de API -->
+      <div class="mt-5">
+        <hr />
+        <h4>Paso 3: Gestión de Usuarios de API</h4>
+        <p>
+          Crea la tabla de usuarios y añade credenciales para proteger tu API.
+        </p>
+        <div class="mb-4">
+          <button
+            class="btn btn-info"
+            (click)="onCreateUsersTable()"
+            [disabled]="isCreatingUsersTable"
+          >
+            <span
+              *ngIf="isCreatingUsersTable"
+              class="spinner-border spinner-border-sm me-2"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            {{
+              isCreatingUsersTable
+                ? "Creando..."
+                : "1. Crear Tabla de Usuarios en BD"
+            }}
+          </button>
+          <small class="d-block mt-2 text-muted">
+            Ejecuta este comando para crear la tabla <code>users</code>. Es
+            seguro ejecutarlo varias veces.
+          </small>
+        </div>
+
+        <h5>2. Añadir Nuevo Usuario</h5>
+        <form
+          [formGroup]="userApiForm"
+          (ngSubmit)="onCreateApiUser()"
+          novalidate
+          class="border rounded p-3 mb-4 bg-light"
+        >
+          <div class="row g-3 align-items-end">
+            <div class="col-md-5">
+              <label for="api-username" class="form-label">Username</label>
+              <input
+                id="api-username"
+                type="text"
+                formControlName="username"
+                class="form-control"
+                [class.is-invalid]="
+                  userApiForm.get('username')?.invalid &&
+                  userApiForm.get('username')?.touched
+                "
+              />
+            </div>
+            <div class="col-md-5">
+              <label for="api-password" class="form-label">Password</label>
+              <input
+                id="api-password"
+                type="password"
+                formControlName="password"
+                class="form-control"
+                [class.is-invalid]="
+                  userApiForm.get('password')?.invalid &&
+                  userApiForm.get('password')?.touched
+                "
+              />
+            </div>
+            <div class="col-md-2">
+              <button
+                type="submit"
+                class="btn btn-primary w-100"
+                [disabled]="isCreatingApiUser || userApiForm.invalid"
+              >
+                <span
+                  *ngIf="isCreatingApiUser"
+                  class="spinner-border spinner-border-sm me-2"
+                  role="status"
+                  aria-hidden="true"
+                ></span>
+                Crear
+              </button>
+            </div>
+          </div>
+          <div
+            *ngIf="
+              userApiForm.get('password')?.touched &&
+              userApiForm.get('password')?.hasError('minlength')
+            "
+            class="text-danger mt-1"
+          >
+            <small>La contraseña debe tener al menos 6 caracteres.</small>
+          </div>
+        </form>
+
+        <div
+          *ngIf="userManagementMessage"
+          class="alert alert-{{ userManagementMessage.type }} mt-3"
+          role="alert"
+        >
+          {{ userManagementMessage.text }}
+        </div>
+
+        <h5 class="mt-4">Usuarios de API Existentes</h5>
+        <div
+          *ngIf="apiUsers.length > 0; else noApiUsers"
+          class="table-responsive"
+        >
+          <table class="table table-striped table-sm">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Creado en</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let user of apiUsers">
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>{{ user.created_at | date: "medium" }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noApiUsers>
+          <p class="text-muted">
+            No se encontraron usuarios. Intenta crear la tabla y añadir uno.
+          </p>
+        </ng-template>
+      </div>
+
+      <!-- Paso 4: Generar API -->
+      <div class="mt-5">
+        <hr />
+        <h4>Paso 4: Generar API</h4>
+        <button class="btn btn-success w-100" (click)="onGenerateApi()">
+          Generar Código de la API
+        </button>
       </div>
     </div>
 

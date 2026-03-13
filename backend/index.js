@@ -2,9 +2,11 @@ const express = require("express");
 const mysql = require("mysql2/promise"); // Usamos la versión con promesas
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 const PORT = 3001;
+
 
 // --- Middlewares ---
 // Habilita CORS para permitir peticiones desde el frontend de Angular (que corre en otro puerto)
@@ -12,6 +14,180 @@ app.use(cors());
 // Permite que Express parsee el cuerpo de las peticiones POST en formato JSON
 app.use(express.json());
 app.use(bodyParser.json());
+
+
+/**
+ * @route   POST /api/execute-sql
+ * @desc    Ejecuta un comando SQL en la base de datos del usuario.
+ * @access  Public
+ */
+app.post("/api/execute-sql", async (req, res) => {
+  const { dbConfig, sql } = req.body;
+  const { host, port, user, pass, dbName } = dbConfig;
+
+  // Validación básica de entrada
+  if (!host || !user || !dbName) {
+    return res.status(400).json({
+      success: false,
+      message: "Los campos host, user y dbName son obligatorios.",
+    });
+  }
+
+  if (!dbConfig || !sql) {
+    return res
+      .status(400)
+      .json({ success: false, message: "dbConfig y sql son requeridos." });
+  }
+
+  let connection;
+  try {
+    // 1. Intenta establecer la conexión con la base de datos del usuario
+    connection = await mysql.createConnection({
+      host: host,
+      port: port || 3306,
+      user: user,
+      password: pass,
+      database: dbName,
+    });
+
+    await connection.query(sql); // Usamos query para poder ejecutar sentencias como CREATE TABLE
+    res.json({ success: true, message: "Comando SQL ejecutado exitosamente." });
+  } catch (error) {
+    console.error(`[ERROR] Ejecutando SQL:`, error.message);
+    res.status(500).json({
+      success: false,
+      message: "Error al ejecutar el comando SQL.",
+      error: error.message,
+    });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+/**
+ * @route   POST /api/create-api-user
+ * @desc    Crea un nuevo usuario para la API en la tabla `users`.
+ * @access  Public
+ */
+app.post("/api/create-api-user", async (req, res) => {
+  const { dbConfig, username, password } = req.body;
+    const { host, port, user, pass, dbName } = dbConfig;
+
+  // Validación básica de entrada
+  if (!host || !user || !dbName) {
+    return res.status(400).json({
+      success: false,
+      message: "Los campos host, user y dbName son obligatorios.",
+    });
+  }
+
+  if (!dbConfig || !username || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "dbConfig, username y password son requeridos.",
+    });
+  }
+
+  let connection;
+  try {
+    // 1. Intenta establecer la conexión con la base de datos del usuario
+    connection = await mysql.createConnection({
+      host: host,
+      port: port || 3306,
+      user: user,
+      password: pass,
+      database: dbName,
+    });
+
+    const [existingUser] = await connection.execute(
+      "SELECT id FROM users_API WHERE username = ?",
+      [username],
+    );
+    if (existingUser.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: "El nombre de usuario ya está en uso.",
+      });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const [result] = await connection.execute(
+      "INSERT INTO users_API (username, password) VALUES (?, ?)",
+      [username, hashedPassword],
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Usuario de API creado exitosamente.",
+      user: { id: result.insertId, username: username },
+    });
+  } catch (error) {
+    console.error(`[ERROR] Creando usuario de API:`, error.message);
+    res.status(500).json({
+      success: false,
+      message: "Error al crear el usuario de API. ¿La tabla `users` existe?",
+      error: error.message,
+    });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+/**
+ * @route   POST /api/get-api-users
+ * @desc    Obtiene los usuarios de la API desde la tabla `users`.
+ * @access  Public
+ */
+app.post("/api/get-api-users", async (req, res) => {
+  const { dbConfig } = req.body;
+    const { host, port, user, pass, dbName } = dbConfig;
+
+  // Validación básica de entrada
+  if (!host || !user || !dbName) {
+    return res.status(400).json({
+      success: false,
+      message: "Los campos host, user y dbName son obligatorios.",
+    });
+  }
+  if (!dbConfig) {
+    return res
+      .status(400)
+      .json({ success: false, message: "dbConfig es requerido." });
+  }
+
+  let connection;
+  try {
+    // 1. Intenta establecer la conexión con la base de datos del usuario
+    connection = await mysql.createConnection({
+      host: host,
+      port: port || 3306,
+      user: user,
+      password: pass,
+      database: dbName,
+    });
+    const [users] = await connection.execute(
+      "SELECT id, username, created_at FROM users_API",
+    );
+    res.json({ success: true, users: users });
+  } catch (error) {
+    // No es un error crítico si la tabla aún no existe.
+    if (error.code === "ER_NO_SUCH_TABLE") {
+      res.json({ success: true, users: [] });
+    } else {
+      console.error(`[ERROR] Obteniendo usuarios de API:`, error.message);
+      res.status(500).json({
+        success: false,
+        message: "Error al obtener los usuarios de API.",
+        error: error.message,
+      });
+    }
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
 // --- Rutas de la API ---
 
 /**
@@ -57,8 +233,8 @@ app.post("/api/analyze-schema", async (req, res) => {
 
     console.log(`[SUCCESS] Análisis de esquema para '${dbName}' en '${host}'.`);
 
-    // 5. Envía una respuesta exitosa con el esquema completo al frontend
-    res.json({ success: true, schema: schema });
+    // 5. Envía una respuesta exitosa con el esquema completo y los nombres de las tablas al frontend
+    res.json({ success: true, tables: tableNames, schema: schema });
   } catch (error) {
     // Si algo falla (credenciales incorrectas, BD no existe, etc.), captura el error
     console.error(
@@ -106,11 +282,10 @@ function generateApiCode(tables, schema, dbConfig) {
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-<<<<<<< HEAD
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = 'tu_clave_secreta_super_segura';
-=======
->>>>>>> 697f67be31eabc8696455f04d7b8bf13a66e6864
+const bcrypt = require('bcryptjs');
+
+const JWT_SECRET = 'tu_clave_secreta_super_segura_y_dificil_de_adivinar'; // ¡CAMBIAR ESTO EN PRODUCCIÓN!
 
 const app = express();
 const port = 3002;
@@ -129,35 +304,59 @@ const dbConfig = {
 async function getConnection() {
   return await mysql.createConnection(dbConfig);
 }
-<<<<<<< HEAD
-  // --- Middleware de Seguridad ---
+
+// --- Middleware de Seguridad ---
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  if (!token) return res.status(401).json({ message: 'Token requerido' });
+  if (!token) return res.status(401).json({ message: 'Acceso denegado. Token no proporcionado.' });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Token inválido o expirado' });
+    if (err) return res.status(403).json({ message: 'Token inválido o expirado.' });
     req.user = user;
     next();
   });
 }
-  // --- Ruta de Login (Ejemplo básico) ---
+
+// --- Rutas de Autenticación ---
+
+
+// LOGIN DE USUARIO
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  // Aquí deberías validar contra tu tabla de usuarios
-  // Por ahora generamos un token si el usuario existe en la petición
-  if (username) {
-    const user = { name: username };
-    const accessToken = jwt.sign(user, JWT_SECRET, { expiresIn: '1h' });
+
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Usuario y contraseña son requeridos.' });
+  }
+
+  let connection;
+  try {
+    connection = await getConnection();
+    const [users] = await connection.execute('SELECT * FROM users WHERE username = ?', [username]);
+
+    if (users.length === 0) {
+      return res.status(401).json({ message: 'Credenciales inválidas.' });
+    }
+
+    const user = users[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Credenciales inválidas.' });
+    }
+
+    const payload = { user: { id: user.id, name: user.username } };
+    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+
     res.json({ accessToken });
-  } else {
-    res.status(400).json({ message: 'Usuario requerido' });
+  } catch (error) {
+    console.error('[ERROR] en /api/login:', error.message);
+    res.status(500).json({ message: 'Error en el servidor durante el login.', error: error.code });
+  } finally {
+    if (connection) await connection.end();
   }
 });
-=======
->>>>>>> 697f67be31eabc8696455f04d7b8bf13a66e6864
 `);
 
   for (const table in tables) {
@@ -170,7 +369,7 @@ app.post('/api/login', async (req, res) => {
       if (operations.read) {
         code.push(`
 // GET all ${table}
-app.get('/api/${table}', async (req, res) => {
+app.get('/api/${table}', authenticateToken, async (req, res) => {
   try {
     const connection = await getConnection();
     const [rows] = await connection.execute('SELECT * FROM \`${table}\`');
@@ -182,7 +381,7 @@ app.get('/api/${table}', async (req, res) => {
 });
 
 // GET ${table} by ${primaryKey}
-app.get('/api/${table}/:${primaryKey}', async (req, res) => {
+app.get('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
   try {
     const connection = await getConnection();
     const [rows] = await connection.execute('SELECT * FROM \`${table}\` WHERE \`${primaryKey}\` = ?', [req.params.${primaryKey}]);
@@ -207,7 +406,7 @@ app.get('/api/${table}/:${primaryKey}', async (req, res) => {
         const columnNames = columns.map((col) => `\`${col}\``).join(", ");
         code.push(`
 // CREATE ${table}
-app.post('/api/${table}', async (req, res) => {
+app.post('/api/${table}', authenticateToken, async (req, res) => {
   try {
     const connection = await getConnection();
     const { ${columns.join(", ")} } = req.body;
@@ -231,7 +430,7 @@ app.post('/api/${table}', async (req, res) => {
         const setClause = columns.map((col) => `\`${col}\` = ?`).join(", ");
         code.push(`
 // UPDATE ${table}
-app.put('/api/${table}/:${primaryKey}', async (req, res) => {
+app.put('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
   try {
     const connection = await getConnection();
     const { ${columns.join(", ")} } = req.body;
@@ -251,7 +450,7 @@ app.put('/api/${table}/:${primaryKey}', async (req, res) => {
       if (operations.delete) {
         code.push(`
 // DELETE ${table}
-app.delete('/api/${table}/:${primaryKey}', async (req, res) => {
+app.delete('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
   try {
     const connection = await getConnection();
     await connection.execute('DELETE FROM \`${table}\` WHERE \`${primaryKey}\` = ?', [req.params.${primaryKey}]);
@@ -276,5 +475,5 @@ app.listen(port, () => {
 }
 // --- Iniciar el servidor ---
 app.listen(PORT, () => {
-  // console.log(`Backend server está escuchando en http://localhost:${PORT}`);
+  console.log(`Backend server está escuchando en http://localhost:${PORT}`);
 });
