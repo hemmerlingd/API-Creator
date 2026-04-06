@@ -7,14 +7,12 @@ const bcrypt = require("bcryptjs");
 const app = express();
 const PORT = 3001;
 
-
 // --- Middlewares ---
 // Habilita CORS para permitir peticiones desde el frontend de Angular (que corre en otro puerto)
 app.use(cors());
 // Permite que Express parsee el cuerpo de las peticiones POST en formato JSON
 app.use(express.json());
 app.use(bodyParser.json());
-
 
 /**
  * @route   POST /api/execute-sql
@@ -65,13 +63,48 @@ app.post("/api/execute-sql", async (req, res) => {
 });
 
 /**
+ * @route   POST /api/test-query
+ * @desc    Ejecuta una consulta SQL de solo lectura (SELECT) y devuelve los resultados.
+ * @access  Public
+ */
+app.post("/api/test-query", async (req, res) => {
+  const { dbConfig, sql } = req.body;
+  const { host, port, user, pass, dbName } = dbConfig;
+
+  if (!host || !user || !dbName || !sql) {
+    return res.status(400).json({ success: false, message: "Faltan parámetros o consulta." });
+  }
+
+  // Validación simple para prevenir comandos destructivos en la vista previa
+  const upperSql = sql.trim().toUpperCase();
+  if (!upperSql.startsWith("SELECT") && !upperSql.startsWith("SHOW") && !upperSql.startsWith("DESCRIBE")) {
+    return res.status(400).json({ success: false, message: "Solo se permiten consultas de lectura (SELECT) para la vista previa." });
+  }
+
+  let connection;
+  try {
+    // 1. Establece la conexión
+    connection = await mysql.createConnection({ host, port: port || 3306, user, password: pass, database: dbName });
+    
+    // 2. Ejecuta y devuelve las filas
+    const [rows] = await connection.execute(sql);
+    res.json({ success: true, rows });
+  } catch (error) {
+    console.error(`[ERROR] Test query:`, error.message);
+    res.status(500).json({ success: false, message: error.message });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+/**
  * @route   POST /api/create-api-user
  * @desc    Crea un nuevo usuario para la API en la tabla `users`.
  * @access  Public
  */
 app.post("/api/create-api-user", async (req, res) => {
   const { dbConfig, username, password } = req.body;
-    const { host, port, user, pass, dbName } = dbConfig;
+  const { host, port, user, pass, dbName } = dbConfig;
 
   // Validación básica de entrada
   if (!host || !user || !dbName) {
@@ -142,7 +175,7 @@ app.post("/api/create-api-user", async (req, res) => {
  */
 app.post("/api/get-api-users", async (req, res) => {
   const { dbConfig } = req.body;
-    const { host, port, user, pass, dbName } = dbConfig;
+  const { host, port, user, pass, dbName } = dbConfig;
 
   // Validación básica de entrada
   if (!host || !user || !dbName) {
@@ -282,10 +315,6 @@ function generateApiCode(tables, schema, dbConfig) {
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-
-const JWT_SECRET = 'tu_clave_secreta_super_segura_y_dificil_de_adivinar'; // ¡CAMBIAR ESTO EN PRODUCCIÓN!
 
 const app = express();
 const port = 3002;
@@ -304,59 +333,6 @@ const dbConfig = {
 async function getConnection() {
   return await mysql.createConnection(dbConfig);
 }
-
-// --- Middleware de Seguridad ---
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) return res.status(401).json({ message: 'Acceso denegado. Token no proporcionado.' });
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: 'Token inválido o expirado.' });
-    req.user = user;
-    next();
-  });
-}
-
-// --- Rutas de Autenticación ---
-
-
-// LOGIN DE USUARIO
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Usuario y contraseña son requeridos.' });
-  }
-
-  let connection;
-  try {
-    connection = await getConnection();
-    const [users] = await connection.execute('SELECT * FROM users WHERE username = ?', [username]);
-
-    if (users.length === 0) {
-      return res.status(401).json({ message: 'Credenciales inválidas.' });
-    }
-
-    const user = users[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: 'Credenciales inválidas.' });
-    }
-
-    const payload = { user: { id: user.id, name: user.username } };
-    const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
-
-    res.json({ accessToken });
-  } catch (error) {
-    console.error('[ERROR] en /api/login:', error.message);
-    res.status(500).json({ message: 'Error en el servidor durante el login.', error: error.code });
-  } finally {
-    if (connection) await connection.end();
-  }
-});
 `);
 
   for (const table in tables) {
@@ -366,13 +342,40 @@ app.post('/api/login', async (req, res) => {
       const primaryKey =
         tableSchema.find((col) => col.Key === "PRI")?.Field || "id";
 
+      let selectFields = [];
+      let joinClauses = [];
+
+      // Construir SELECT y JOINs dinámicos basados en relaciones
+      tableSchema.forEach((col) => {
+        if (col.relatedWith && schema[col.relatedWith.table]) {
+          const relTable = col.relatedWith.table;
+          const relField = col.relatedWith.fieldId;
+          const relFieldData = col.relatedWith.fieldShow;
+          const relTableAlias = `${relTable}_rel`; // Alias único para evitar colisiones
+          const relPK = relField;
+          //   schema[relTable].find((c) => c.Key === "PRI")?.Field || "id";
+
+          selectFields.push(
+            `\`${relTableAlias}\`.\`${relFieldData}\` AS \`${relTableAlias}\``,
+          );
+          joinClauses.push(
+            `LEFT JOIN \`${relTable}\` AS \`${relTableAlias}\` ON \`${table}\`.\`${col.Field}\` = \`${relTableAlias}\`.\`${relPK}\``,
+          );
+        } else {
+          selectFields.push(`\`${table}\`.\`${col.Field}\``);
+        }
+      });
+
+      const selectString = selectFields.join(", ");
+      const fromString = `\`${table}\` ${joinClauses.join(" ")}`.trim();
+
       if (operations.read) {
         code.push(`
 // GET all ${table}
-app.get('/api/${table}', authenticateToken, async (req, res) => {
+app.get('/api/${table}', async (req, res) => {
   try {
     const connection = await getConnection();
-    const [rows] = await connection.execute('SELECT * FROM \`${table}\`');
+    const [rows] = await connection.execute('SELECT ${selectString} FROM ${fromString}');
     await connection.end();
     res.json(rows);
   } catch (error) {
@@ -381,10 +384,10 @@ app.get('/api/${table}', authenticateToken, async (req, res) => {
 });
 
 // GET ${table} by ${primaryKey}
-app.get('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
+app.get('/api/${table}/:${primaryKey}', async (req, res) => {
   try {
     const connection = await getConnection();
-    const [rows] = await connection.execute('SELECT * FROM \`${table}\` WHERE \`${primaryKey}\` = ?', [req.params.${primaryKey}]);
+    const [rows] = await connection.execute('SELECT ${selectString} FROM ${fromString} WHERE \`${table}\`.\`${primaryKey}\` = ?', [req.params.${primaryKey}]);
     await connection.end();
     if (rows.length > 0) {
       res.json(rows[0]);
@@ -406,7 +409,7 @@ app.get('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
         const columnNames = columns.map((col) => `\`${col}\``).join(", ");
         code.push(`
 // CREATE ${table}
-app.post('/api/${table}', authenticateToken, async (req, res) => {
+app.post('/api/${table}', async (req, res) => {
   try {
     const connection = await getConnection();
     const { ${columns.join(", ")} } = req.body;
@@ -430,7 +433,7 @@ app.post('/api/${table}', authenticateToken, async (req, res) => {
         const setClause = columns.map((col) => `\`${col}\` = ?`).join(", ");
         code.push(`
 // UPDATE ${table}
-app.put('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
+app.put('/api/${table}/:${primaryKey}', async (req, res) => {
   try {
     const connection = await getConnection();
     const { ${columns.join(", ")} } = req.body;
@@ -450,7 +453,7 @@ app.put('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
       if (operations.delete) {
         code.push(`
 // DELETE ${table}
-app.delete('/api/${table}/:${primaryKey}', authenticateToken, async (req, res) => {
+app.delete('/api/${table}/:${primaryKey}', async (req, res) => {
   try {
     const connection = await getConnection();
     await connection.execute('DELETE FROM \`${table}\` WHERE \`${primaryKey}\` = ?', [req.params.${primaryKey}]);

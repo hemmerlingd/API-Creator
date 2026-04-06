@@ -1,9 +1,8 @@
 <main class="container">
   <header>
     <h1>Creador de APIs Node.js + MySQL</h1>
-    <p>
-      Paso 1: Conéctate a tu base de datos MySQL para analizar su estructura.
-    </p>
+    <h4>Paso 1:</h4>
+    <p>Conéctate a tu base de datos MySQL para analizar su estructura.</p>
   </header>
 
   <section
@@ -103,139 +102,414 @@
 
       <!-- Paso 2: Selección de Tablas y CRUDs -->
       <div *ngIf="tableNames.length > 0">
-        <h4>Paso 2: Selecciona las operaciones CRUD para cada tabla</h4>
+        <h4>Paso 2:</h4>
+        <p class="text-muted ms-4">
+          Selecciona los métodos CRUD y personalizados para cada tabla <br />
+          Relaciona las tablas para mejores visualizaciones
+        </p>
+
         <form [formGroup]="selectionForm" class="mt-3">
-          <ul class="list-group">
-            <li
+          <!-- Vista tipo Diagrama Entidad-Relación -->
+          <div
+            class="d-flex flex-wrap gap-4 p-4 rounded shadow-inner"
+            style="
+              background-color: #f0f2f5;
+              border: 1px solid #ddd;
+              min-height: 400px;
+              overflow-x: auto;
+            "
+          >
+            <div
               *ngFor="let table of tableNames; index as i"
-              class="list-group-item"
+              class="card shadow-sm"
+              style="width: 250px; border-radius: 0; border: 1px solid #999"
               [formGroupName]="table"
             >
+              <!-- Cabecera de la tabla -->
               <div
-                class="checks d-flex flex-wrap justify-content-between align-items-center"
-                [ngClass]="{ 'list-group-item-light': i % 2 !== 0 }"
+                class="card-header bg-primary text-white text-center py-1"
+                style="border-radius: 0; border-bottom: 1px solid #999"
               >
-                <div class="form-check form-check-inline">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    id="{{ table }}-all"
-                    formControlName="all"
-                    (change)="onAllChange($event, table)"
-                  />
-                  <label
-                    class="form-check-label fw-bold me-2 mb-2 mb-md-0"
-                    for="{{ table }}-all"
-                    >{{ table }}</label
-                  >
-                  <small
-                    class="text-primary"
-                    style="cursor: pointer"
-                    (click)="toggleSchema(table)"
-                  >
-                    {{
-                      isSchemaExpanded(table)
-                        ? "(ocultar esquema)"
-                        : "(ver esquema)"
-                    }}
-                  </small>
-                </div>
+                <h6 class="m-0 fw-bold">{{ table }}</h6>
+              </div>
 
-                <div class="d-flex flex-wrap align-items-center">
-                  <!-- Checkboxes para Read, Create, Update, Delete -->
-                  <div class="form-check form-check-inline">
+              <!-- Lista de Campos (Schema) -->
+              <div class="card-body p-0 bg-white">
+                <ul
+                  class="list-group list-group-flush"
+                  style="font-size: 0.85rem"
+                >
+                  <li
+                    class="list-group-item d-flex justify-content-between align-items-center px-2 py-1 border-0 border-bottom"
+                    style="border-color: #eee !important"
+                    *ngFor="let col of apiResponse.schema?.[table]"
+                  >
+                    <span>
+                      {{ col.Field }}
+                      <small
+                        *ngIf="col.relatedWith"
+                        class="text-primary fw-bold ms-1"
+                        style="font-size: 0.7rem"
+                        data-bs-toggle="modal"
+                        data-bs-target="#relationModal"
+                        (click)="openRelationModal(col)"
+                        role="button"
+                      >
+                        {{ col.relatedWith.table
+                        }}<span>({{ col.relatedWith.fieldShow }})</span>
+                      </small>
+                    </span>
+                    <span>
+                      <button
+                        *ngIf="
+                          col.Key != 'PRI' &&
+                          col.Key != 'MUL' &&
+                          col.Key != 'FK' &&
+                          col.Type.includes('int')
+                        "
+                        class="btn btn-sm btn-outline-primary w-100 mt-1"
+                        style="font-size: 0.8rem"
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#relationModal"
+                        (click)="openRelationModal(col)"
+                      >
+                        +
+                      </button>
+                      <strong
+                        *ngIf="col.Key === 'PRI'"
+                        class="text-dark fst-italic"
+                        >PK</strong
+                      >
+                      <strong
+                        *ngIf="col.Key === 'MUL' || col.Key === 'FK'"
+                        class="text-dark"
+                        >FK</strong
+                      >
+                    </span>
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Controles de configuración (CRUD y Relaciones) -->
+              <div
+                class="card-footer bg-light p-2 border-top"
+                style="border-color: #999 !important"
+              >
+                <div
+                  class="d-flex justify-content-between align-items-center mb-2"
+                  style="font-size: 0.8rem"
+                >
+                  <span class="fw-bold text-muted">Metodos</span>
+                  <div class="form-check form-check-inline m-0">
                     <input
                       class="form-check-input"
+                      style="transform: scale(0.85)"
                       type="checkbox"
-                      id="{{ table }}-read"
+                      id="{{ table }}-all"
+                      formControlName="all"
+                      (change)="onAllChange($event, table)"
+                    />
+                    <label
+                      class="form-check-label text-muted"
+                      for="{{ table }}-all"
+                      >Todo</label
+                    >
+                  </div>
+                </div>
+                <div class="px-2 mb-2" style="font-size: 0.75rem">
+                  <div
+                    class="form-check p-0 m-0 d-flex gap-2 align-items-center"
+                  >
+                    <input
+                      class="form-check-input m-0"
+                      type="checkbox"
                       formControlName="read"
                       (change)="onCrudChange(table)"
                     />
-                    <label class="form-check-label" for="{{ table }}-read"
-                      >Leer</label
-                    >
+                    <label class="text-muted mt-1">Read()</label>
                   </div>
-                  <div class="form-check form-check-inline">
+                  <div
+                    class="form-check p-0 m-0 d-flex gap-2 align-items-center"
+                  >
                     <input
-                      class="form-check-input"
+                      class="form-check-input m-0"
                       type="checkbox"
-                      id="{{ table }}-create"
                       formControlName="create"
                       (change)="onCrudChange(table)"
                     />
-                    <label class="form-check-label" for="{{ table }}-create"
-                      >Crear</label
-                    >
+                    <label class="text-muted mt-1">Create()</label>
                   </div>
-                  <div class="form-check form-check-inline">
+                  <div
+                    class="form-check p-0 m-0 d-flex gap-2 align-items-center"
+                  >
                     <input
-                      class="form-check-input"
+                      class="form-check-input m-0"
                       type="checkbox"
-                      id="{{ table }}-update"
                       formControlName="update"
                       (change)="onCrudChange(table)"
                     />
-                    <label class="form-check-label" for="{{ table }}-update"
-                      >Actualizar</label
-                    >
+                    <label class="text-muted mt-1">Update()</label>
                   </div>
-                  <div class="form-check form-check-inline">
+                  <div
+                    class="form-check p-0 m-0 d-flex gap-2 align-items-center"
+                  >
                     <input
-                      class="form-check-input"
+                      class="form-check-input m-0"
                       type="checkbox"
-                      id="{{ table }}-delete"
                       formControlName="delete"
                       (change)="onCrudChange(table)"
                     />
-                    <label class="form-check-label" for="{{ table }}-delete"
-                      >Eliminar</label
+                    <label class="text-muted mt-1">Delete()</label>
+                  </div>
+                  <div
+                    class="form-check p-0 m-0 d-flex gap-2 align-items-center"
+                  >
+                    <button
+                      class="btn btn-sm btn-outline-primary mt-1"
+                      style="font-size: 0.8rem"
+                      type="button"
+                      data-bs-toggle="modal"
+                      data-bs-target="#modalConsulta"
+                      (click)="openConsultaModal(table)"
                     >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </form>
+      </div>
 
-              <!-- Esquema de la tabla (colapsable) -->
-              <div class="w-100 mt-3" *ngIf="isSchemaExpanded(table)">
-                <div class="table-responsive">
-                  <table
-                    class="table table-sm table-bordered table-striped mb-0"
-                    style="font-size: 0.85rem"
+      <div
+        class="modal fade"
+        id="relationModal"
+        tabindex="-1"
+        aria-labelledby="relationModalLabel"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h1 class="modal-title fs-5" id="relationModalLabel">
+                {{ relacionarData?.Field }} relacionado con
+              </h1>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <label for="relacion">Tabla Relacionada</label><br />
+              <select
+                name="relacion"
+                id="relacion"
+                class="form-select"
+                aria-label="Default select example"
+                [(ngModel)]="Stable"
+                (change)="onTableSelectChange()"
+              >
+                <option value="0" selected>Seleccione Tabla</option>
+                <option
+                  *ngFor="let table of tableNames; index as i"
+                  [ngValue]="table"
+                >
+                  {{ table }}
+                </option>
+              </select>
+              <div class="form-control">
+                <label for="campoid">Id Relacional</label><br />
+                <select
+                  name="campoid"
+                  id="campoid"
+                  class="form-select mt-2"
+                  aria-label="campo ID"
+                  *ngIf="Stable && Stable !== '0'"
+                  [(ngModel)]="campoid"
+                >
+                  <option value="0" selected>Seleccione Campo</option>
+                  <option
+                    *ngFor="let col of apiResponse.schema?.[Stable]"
+                    [value]="col.Field"
                   >
-                    <thead class="table-light">
-                      <tr>
-                        <th>Field</th>
-                        <th>Type</th>
-                        <th>Null</th>
-                        <th>Key</th>
-                        <th>Default</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr *ngFor="let col of apiResponse.schema?.[table]">
-                        <td>{{ col.Field }}</td>
-                        <td>{{ col.Type }}</td>
-                        <td>{{ col.Null }}</td>
-                        <td>{{ col.Key }}</td>
-                        <td>{{ col.Default }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                    {{ col.Field }}
+                  </option>
+                </select>
+                <label for="campo">Campo a mostrar</label><br />
+                <select
+                  name="campo"
+                  id="campo"
+                  class="form-select mt-2"
+                  aria-label="Default select example"
+                  *ngIf="Stable && Stable !== '0'"
+                  [(ngModel)]="campo"
+                >
+                  <option value="0" selected>Seleccione Campo</option>
+                  <option
+                    *ngFor="let col of apiResponse.schema?.[Stable]"
+                    [value]="col.Field"
+                  >
+                    {{ col.Field }}
+                  </option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                data-bs-dismiss="modal"
+                (click)="relacionar(relacionarData, Stable, campoid, campo)"
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="modal fade"
+        id="modalConsulta"
+        tabindex="-1"
+        aria-labelledby="consultaModalLabel"
+        aria-hidden="true"
+      >
+        <div class="modal-dialog modal-xl">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h1 class="modal-title fs-5" id="consultaModalLabel">
+                Crear nuevo metodo
+              </h1>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <h6>Nombre del Método</h6>
+
+              <input type="text" row="10" class="form-control" />
+              <div class="row form-group mt-5">
+                <div class="col-9">
+                  <h6>SQL de la consulta</h6>
+                  <textarea
+                    class="form-control "
+                    [(ngModel)]="consultaData"
+                    rows="9"
+                    cols="50"
+                    [innerHTML]="consultaData"
+                  >
+
+                  </textarea>
+                </div>
+                <div class="col-3">
+                  <h6>Listado de Tablas y Campos</h6>
+                  <select
+                    name="relacion"
+                    id="relacion"
+                    class="form-select"
+                    aria-label="Default select example"
+                    [(ngModel)]="constable"
+                  >
+                    <option value="0" selected>Seleccione Tabla</option>
+                    <option
+                      *ngFor="let table of tableNames; index as i"
+                      [ngValue]="table"
+                    >
+                      {{ table }}
+                    </option>
+                  </select>
+                  
+                  <select
+                    name="campo"
+                    id="campo"
+                    class="form-select mt-2"
+                    size="8"
+                    aria-label="Default select example"
+                    *ngIf="constable && constable !== '0'"
+                  >
+                    <option value="0" selected>Seleccione Campo</option>
+                    <option
+                      *ngFor="let col of apiResponse.schema?.[constable]"
+                      [value]="col.Field"
+                      (click)="Enviarvalor(col.Field)"
+                    >
+                      {{ col.Field }}
+                    </option>
+                  </select>
                 </div>
               </div>
-            </li>
-          </ul>
-        </form>
+              <button class="btn btn-primary" (click)="test()">Vista previa</button>
+
+              <!-- Tabla de Resultados de la Consulta -->
+              <div class="row mt-4">
+                <div class="col-12">
+                  <div *ngIf="queryError" class="alert alert-danger mb-0">{{ queryError }}</div>
+                  <div *ngIf="queryResults" class="table-responsive border rounded" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm table-bordered table-striped mb-0" style="font-size: 0.85rem">
+                      <thead class="table-dark sticky-top">
+                        <tr>
+                          <th *ngFor="let key of queryKeys">{{ key }}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let row of queryResults">
+                          <td *ngFor="let key of queryKeys">{{ row[key] }}</td>
+                        </tr>
+                        <tr *ngIf="queryResults.length === 0">
+                          <td [attr.colspan]="queryKeys.length || 1" class="text-center text-muted py-3">0 resultados encontrados</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                data-bs-dismiss="modal"
+                (click)="relacionar(relacionarData, Stable, campoid, campo)"
+              >
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Paso 3: Gestión de Usuarios de API -->
       <div class="mt-5">
         <hr />
         <h4>Paso 3: Gestión de Usuarios de API</h4>
-        <p>
+        <p *ngIf="apiUsers.length == 0">
           Crea la tabla de usuarios y añade credenciales para proteger tu API.
         </p>
         <div class="mb-4">
           <button
+            *ngIf="apiUsers.length == 0"
             class="btn btn-info"
             (click)="onCreateUsersTable()"
             [disabled]="isCreatingUsersTable"
@@ -249,16 +523,16 @@
             {{
               isCreatingUsersTable
                 ? "Creando..."
-                : "1. Crear Tabla de Usuarios en BD"
+                : " Crear Tabla de Usuarios en BD"
             }}
           </button>
-          <small class="d-block mt-2 text-muted">
+          <small class="d-block mt-2 text-muted" *ngIf="apiUsers.length == 0">
             Ejecuta este comando para crear la tabla <code>users</code>. Es
             seguro ejecutarlo varias veces.
           </small>
         </div>
 
-        <h5>2. Añadir Nuevo Usuario</h5>
+        <h5>Añadir Nuevo Usuario</h5>
         <form
           [formGroup]="userApiForm"
           (ngSubmit)="onCreateApiUser()"

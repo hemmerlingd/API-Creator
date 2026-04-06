@@ -79,4 +79,11 @@ export class ApiGeneratorService {
       .post<any>(`${this.apiUrl}/create-api-user`, payload)
       .pipe(catchError(this.handleError));
   }
+
+  
+  testQuery(payload: { dbConfig: DbCredentials; sql: string }): Observable<any> {
+    return this.http
+      .post<any>(`${this.apiUrl}/test-query`, payload)
+      .pipe(catchError(this.handleError));
+  }
 }

@@ -16,3 +16,8 @@ body {
   color: var(--dark-gray);
   line-height: 1.5;
 }
+
+.card-body{
+      max-height: 265px;
+    overflow-y: scroll;
+}

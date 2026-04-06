@@ -59,13 +59,39 @@ async function getConnection() {
       const primaryKey =
         tableSchema.find((col) => col.Key === "PRI")?.Field || "id";
 
+      let selectFields = [];
+      let joinClauses = [];
+
+      // Construir SELECT y JOINs dinámicos basados en relaciones
+      tableSchema.forEach((col) => {
+        if (col.relatedWith && schema[col.relatedWith.table]) {
+          const relTable = col.relatedWith.table;
+          const relField = col.relatedWith.field;
+          const relTableAlias = `${relTable}_${col.Field}`; // Alias único para evitar colisiones
+          const relPK =
+            schema[relTable].find((c) => c.Key === "PRI")?.Field || "id";
+          console.log(`[INFO] Esquema -> '${schema[relTable]}' .`);
+          selectFields.push(
+            `\`${relTableAlias}\`.\`${relField}\` AS \`${col.Field}\``,
+          );
+          joinClauses.push(
+            `LEFT JOIN \`${relTable}\` AS \`${relTableAlias}\` ON \`${table}\`.\`${col.Field}\` = \`${relTableAlias}\`.\`${relPK}\``,
+          );
+        } else {
+          selectFields.push(`\`${table}\`.\`${col.Field}\``);
+        }
+      });
+
+      const selectString = selectFields.join(", ");
+      const fromString = `\`${table}\` ${joinClauses.join(" ")}`.trim();
+
       if (operations.read) {
         code.push(`
 // GET all ${table}
 app.get('/api/${table}', async (req, res) => {
   try {
     const connection = await getConnection();
-    const [rows] = await connection.execute('SELECT * FROM \`${table}\`');
+    const [rows] = await connection.execute('SELECT ${selectString} FROM ${fromString}');
     await connection.end();
     res.json(rows);
   } catch (error) {
@@ -77,7 +103,7 @@ app.get('/api/${table}', async (req, res) => {
 app.get('/api/${table}/:${primaryKey}', async (req, res) => {
   try {
     const connection = await getConnection();
-    const [rows] = await connection.execute('SELECT * FROM \`${table}\` WHERE \`${primaryKey}\` = ?', [req.params.${primaryKey}]);
+    const [rows] = await connection.execute('SELECT ${selectString} FROM ${fromString} WHERE \`${table}\`.\`${primaryKey}\` = ?', [req.params.${primaryKey}]);
     await connection.end();
     if (rows.length > 0) {
       res.json(rows[0]);

@@ -20,6 +20,21 @@ export class AppComponent implements OnInit {
   isCreatingUsersTable = false;
   isCreatingApiUser = false;
 
+  //MODAL RELACION
+  Stable: any;
+  campoid: any;
+  campo: any;
+  relacionarData: any;
+
+  //MODAL CONSULTA
+  constable: any;
+  conscampoid: any;
+  conscampo: any;
+  consultaData: any = 'SELECT ';
+  queryResults: any[] | null = null;
+  queryError: string | null = null;
+  queryKeys: string[] = [];
+
   apiResponse: ApiResponse | null = null;
   apiUsers: any[] = [];
   userManagementMessage: { type: 'success' | 'danger'; text: string } | null =
@@ -238,6 +253,7 @@ CREATE TABLE IF NOT EXISTS users_api (
       tables: this.selectionForm.value,
       schema: this.apiResponse.schema,
     };
+
     this.apiService.generateApi(payload).subscribe({
       next: (res) => {
         this.generatedApiCode = res.generatedApi;
@@ -246,6 +262,168 @@ CREATE TABLE IF NOT EXISTS users_api (
         console.error('Error al generar la API:', err);
       },
     });
+  }
+
+  openRelationModal(col: any): void {
+    this.relacionarData = col;
+    this.Stable = '0';
+    this.campoid = '0';
+    this.campo = '0';
+
+    if (!col || !col.Field) return;
+
+    // Intentar adivinar la tabla (ej. "id_documento" -> "documento" o "documentos")
+    let guessedTableName = '';
+    const fieldName = col.Field.toLowerCase();
+    if (fieldName.startsWith('id_')) {
+      guessedTableName = fieldName.substring(3);
+    } else if (fieldName.endsWith('_id')) {
+      guessedTableName = fieldName.substring(0, fieldName.length - 3);
+    }
+
+    // Buscar si esa tabla existe en el esquema (case insensitive), soportando plurales ('s', 'es')
+    const targetTable = this.tableNames.find((t) => {
+      const lowerT = t.toLowerCase();
+      return (
+        lowerT === guessedTableName ||
+        lowerT === guessedTableName + 's' ||
+        lowerT === guessedTableName + 'es'
+      );
+    });
+
+    if (targetTable) {
+      this.Stable = targetTable;
+      this.autoSelectFields();
+    }
+  }
+
+  openConsultaModal(tabla: any): void {
+    this.constable = tabla;
+    this.conscampoid = '0';
+    this.conscampo = '0';
+    this.queryResults = null;
+    this.queryError = null;
+    this.queryKeys = [];
+  }
+
+  onTableSelectChange(): void {
+    this.autoSelectFields();
+  }
+
+  Enviarvalor(val: any) {
+    const tabla_origen = this.constable;
+    const campo = val;
+    const fieldSelect = `\`${tabla_origen}\`.\`${campo}\``;
+
+    // 1. Si la consulta está vacía o solo tiene la palabra SELECT inicial
+    if (
+      !this.consultaData ||
+      this.consultaData.trim().toUpperCase() === 'SELECT'
+    ) {
+      this.consultaData = `SELECT \n  ${fieldSelect} \nFROM \`${tabla_origen}\``;
+      return;
+    }
+
+    // 2. Buscamos dónde comienza la cláusula FROM
+    const fromRegex = /\bFROM\b/i;
+    const match = this.consultaData.match(fromRegex);
+
+    if (match) {
+      const fromIndex = match.index;
+      const selectPart = this.consultaData.substring(0, fromIndex).trim();
+      let fromPart = this.consultaData.substring(fromIndex).trim();
+
+      // Solo agregamos el campo si no está ya en el SELECT
+      if (!selectPart.includes(fieldSelect)) {
+        const newSelectPart = `${selectPart},\n  ${fieldSelect}\n`;
+
+        // Verificamos si la tabla_origen ya está en el FROM o en algún JOIN
+        const tableRegex = new RegExp(`\\\`?${tabla_origen}\\\`?`, 'i');
+        if (!tableRegex.test(fromPart)) {
+          // Si no está, buscamos su Primary Key para armar un INNER JOIN de ejemplo
+          const schema = this.apiResponse?.schema?.[tabla_origen];
+          const pkCol = schema?.find((c: any) => c.Key === 'PRI');
+          const pk = pkCol ? pkCol.Field : 'id';
+
+          fromPart += `\nINNER JOIN \`${tabla_origen}\` ON \`${tabla_origen}\`.\`${pk}\` = [[ tabla_origen_origen.campo_origen ]]`;
+        }
+
+        this.consultaData = `${newSelectPart}${fromPart}`;
+      }
+    } else {
+      // Por si borraron el FROM manualmente en el textarea
+      if (!this.consultaData.includes(fieldSelect)) {
+        this.consultaData = `${this.consultaData.trim()},\n  ${fieldSelect}`;
+      }
+    }
+  }
+
+  test(){
+    this.queryError = null;
+    this.queryResults = null;
+    this.queryKeys = [];
+
+    if (!this.consultaData || this.consultaData.trim() === '' || this.consultaData.trim().toUpperCase() === 'SELECT') {
+      this.queryError = 'La consulta está vacía o incompleta.';
+      return;
+    }
+
+    const payload = {
+      dbConfig: this.dbForm.value,
+      sql: this.consultaData
+    };
+
+    this.apiService.testQuery(payload).subscribe({
+      next: (res) => {
+        if (res.success) {
+          this.queryResults = res.rows;
+          if (this.queryResults && this.queryResults.length > 0) {
+            this.queryKeys = Object.keys(this.queryResults[0]); // Para construir el <thead>
+          }
+        } else {
+          this.queryError = res.message;
+        }
+      },
+      error: (err) => {
+        this.queryError = err.error?.message || 'Error al ejecutar la consulta.';
+      }
+    });
+  }
+
+  autoSelectFields(): void {
+    if (
+      this.Stable &&
+      this.Stable !== '0' &&
+      this.apiResponse?.schema?.[this.Stable]
+    ) {
+      const schema = this.apiResponse.schema[this.Stable];
+      // Buscar la Primary Key, o tomar el primer campo como fallback
+      const pkCol = schema.find((c: any) => c.Key === 'PRI');
+      this.campoid = pkCol ? pkCol.Field : schema[0]?.Field || '0';
+
+      // Tomar el segundo campo como el "dato a mostrar", o el primero si solo hay uno
+      this.campo =
+        schema.length > 1 ? schema[1].Field : schema[0]?.Field || '0';
+    } else {
+      this.campoid = '0';
+      this.campo = '0';
+    }
+  }
+
+  relacionar(origen: any, tabla: any, campoid: any, campo: any) {
+    console.log('Relacionando:', origen.Field, 'con', tabla, campo);
+
+    // Validamos que vengan los datos correctos
+    if (origen && tabla && campo && tabla !== '0' && campo !== '0') {
+      // Cambiamos el 'Key' para que la UI muestre la etiqueta 'FK' dinámicamente
+      origen.Key = 'FK';
+      // Agregamos el objeto de la relación al campo
+      origen.relatedWith = {
+        table: tabla,
+        fieldId: campoid,
+        fieldShow: campo,
+      };
+    }
   }
 
   get tableNames(): string[] {

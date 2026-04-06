@@ -3,7 +3,7 @@ import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
 
 import { AppComponent } from './app.component';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 
 @NgModule({
@@ -14,6 +14,7 @@ import { DatePipe } from '@angular/common';
     BrowserModule,
     HttpClientModule,
     ReactiveFormsModule,
+    FormsModule
   ],
   providers: [DatePipe],
   bootstrap: [AppComponent]
