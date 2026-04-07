@@ -6,6 +6,8 @@ import {
 } from './services/api-generator.service';
 import { finalize } from 'rxjs/operators';
 
+declare var bootstrap: any;
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -172,9 +174,13 @@ CREATE TABLE IF NOT EXISTS users_api (
 
   // --- User Management Methods ---
 
-  getApiUsers(): void {
+  getApiUsers(importJson: any = null): void {
     if (!this.dbForm.valid) return;
-    this.apiService.getApiUsers(this.dbForm.value).subscribe({
+    let busca = this.dbForm.value;
+    if (importJson) {
+      busca = importJson;
+    }
+    this.apiService.getApiUsers(busca).subscribe({
       next: (res) => {
         if (res.success) {
           this.apiUsers = res.users;
@@ -358,19 +364,23 @@ CREATE TABLE IF NOT EXISTS users_api (
     }
   }
 
-  test(){
+  test() {
     this.queryError = null;
     this.queryResults = null;
     this.queryKeys = [];
 
-    if (!this.consultaData || this.consultaData.trim() === '' || this.consultaData.trim().toUpperCase() === 'SELECT') {
+    if (
+      !this.consultaData ||
+      this.consultaData.trim() === '' ||
+      this.consultaData.trim().toUpperCase() === 'SELECT'
+    ) {
       this.queryError = 'La consulta está vacía o incompleta.';
       return;
     }
 
     const payload = {
       dbConfig: this.dbForm.value,
-      sql: this.consultaData
+      sql: this.consultaData,
     };
 
     this.apiService.testQuery(payload).subscribe({
@@ -385,8 +395,9 @@ CREATE TABLE IF NOT EXISTS users_api (
         }
       },
       error: (err) => {
-        this.queryError = err.error?.message || 'Error al ejecutar la consulta.';
-      }
+        this.queryError =
+          err.error?.message || 'Error al ejecutar la consulta.';
+      },
     });
   }
 
@@ -429,7 +440,68 @@ CREATE TABLE IF NOT EXISTS users_api (
   get tableNames(): string[] {
     return this.apiResponse?.schema ? Object.keys(this.apiResponse.schema) : [];
   }
+
   copy() {
     navigator.clipboard.writeText(this.generatedApiCode || '');
+    const toastElement = document.getElementById('liveToast');
+    if (toastElement) {
+      const toast = new bootstrap.Toast(toastElement);
+      toast.show();
+    }
+  }
+
+  saveJSON(nombre: string) {
+    const projectData = {
+      dbConfig: this.dbForm.value,
+      apiResponse: this.apiResponse,
+      selectionForm: this.selectionForm.value,
+      consultaData: this.consultaData,
+    };
+    const blob = new Blob([JSON.stringify(projectData, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre + ' APIGenerator-Proyect.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  importJSON(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      const file = input.files[0];
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const projectData = JSON.parse(e.target?.result as string);
+
+          if (projectData.dbConfig) {
+            this.dbForm.patchValue(projectData.dbConfig);
+          }
+          if (projectData.apiResponse) {
+            this.apiResponse = projectData.apiResponse;
+            if (this.apiResponse?.schema) {
+              this.buildSelectionForm(Object.keys(this.apiResponse.schema));
+            }
+          }
+          if (projectData.selectionForm) {
+            this.selectionForm.patchValue(projectData.selectionForm);
+          }
+          if (projectData.consultaData) {
+            this.consultaData = projectData.consultaData;
+          }
+          this.getApiUsers(projectData.dbConfig);
+        } catch (error) {
+          console.error('Error parseando el archivo JSON', error);
+          alert('Error al importar: el archivo no tiene un formato válido.');
+        }
+      };
+      reader.readAsText(file);
+    }
+    // Limpiar el input para permitir importar el mismo archivo de nuevo si se necesita
+    input.value = '';
   }
 }

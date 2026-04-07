@@ -1,90 +1,137 @@
 <main class="container">
   <header>
     <h1>Creador de APIs Node.js + MySQL</h1>
-    <h4>Paso 1:</h4>
-    <p>Conéctate a tu base de datos MySQL para analizar su estructura.</p>
   </header>
 
   <section
-    class="form-section w-100 border border-1 p-4 p-md-5 rounded shadow-sm"
+    class="form-section w-100 border border-1 p-2 p-md-3 rounded shadow-sm alert alert-success"
+    *ngIf="!apiResponse"
   >
-    <form [formGroup]="dbForm" (ngSubmit)="onSubmit()" novalidate>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label for="host" class="form-label">Host</label>
-          <input
-            id="host"
-            type="text"
-            formControlName="host"
-            class="form-control"
-          />
-        </div>
-        <div class="col-md-6">
-          <label for="port" class="form-label">Puerto</label>
-          <input
-            id="port"
-            type="number"
-            formControlName="port"
-            class="form-control"
-          />
-        </div>
-        <div class="col-md-6">
-          <label for="user" class="form-label">Usuario</label>
-          <input
-            id="user"
-            type="text"
-            formControlName="user"
-            class="form-control"
-          />
-        </div>
-        <div class="col-md-6">
-          <label for="pass" class="form-label">Contraseña</label>
-          <input
-            id="pass"
-            type="password"
-            formControlName="pass"
-            placeholder="(opcional)"
-            class="form-control"
-          />
-        </div>
-        <div class="col-12">
-          <label for="dbName" class="form-label"
-            >Nombre de la Base de Datos</label
-          >
-          <input
-            id="dbName"
-            type="text"
-            formControlName="dbName"
-            class="form-control"
-            [class.is-invalid]="
-              dbForm.get('dbName')?.invalid && dbForm.get('dbName')?.touched
-            "
-          />
-          <div
-            *ngIf="
-              dbForm.get('dbName')?.invalid && dbForm.get('dbName')?.touched
-            "
-            class="invalid-feedback"
-          >
-            El nombre de la base de datos es requerido.
-          </div>
-        </div>
-      </div>
+    <h4>Paso 1:</h4>
+    <p>Conéctate a tu base de datos MySQL para analizar su estructura.</p>
 
-      <button
-        class="btn btn-primary w-100 mt-4"
-        type="submit"
-        [disabled]="isLoading"
+    <ul class="nav nav-tabs p-3" id="myTab" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button
+          class="nav-link active"
+          id="mysql-tab"
+          data-bs-toggle="tab"
+          data-bs-target="#mysql"
+          type="button"
+          role="tab"
+          aria-controls="mysql"
+          aria-selected="true"
+        >
+          Base de Datos MySQL
+        </button>
+      </li>
+      <li class="nav-item">
+        <!-- <a class="nav-link" href="#">Link</a> -->
+        <!-- Input oculto para seleccionar el archivo -->
+        <input
+          type="file"
+          #fileInput
+          (change)="importJSON($event)"
+          accept=".json"
+          style="display: none"
+        />
+
+        <!-- Botón que hace clic en el input oculto -->
+        <button class="nav-link border border-1 rounded text-black" (click)="fileInput.click()">
+          Importar Proyecto
+        </button>
+      </li>
+
+      <!-- <li class="nav-item" role="presentation">
+    <button class="nav-link" id="contact-tab" data-bs-toggle="tab" data-bs-target="#contact" type="button" role="tab" aria-controls="contact" aria-selected="false">Contact</button>
+  </li> -->
+    </ul>
+    <div class="tab-content" id="myTabContent">
+      <div
+        class="tab-pane fade show active"
+        id="mysql"
+        role="tabpanel"
+        aria-labelledby="mysql-tab"
       >
-        <span
-          *ngIf="isLoading"
-          class="spinner-border spinner-border-sm me-2"
-          role="status"
-          aria-hidden="true"
-        ></span>
-        {{ isLoading ? "Analizando..." : "Analizar Base de Datos" }}
-      </button>
-    </form>
+        <form [formGroup]="dbForm" (ngSubmit)="onSubmit()" novalidate>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="host" class="form-label">Host</label>
+              <input
+                id="host"
+                type="text"
+                formControlName="host"
+                class="form-control"
+              />
+            </div>
+            <div class="col-md-6">
+              <label for="port" class="form-label">Puerto</label>
+              <input
+                id="port"
+                type="number"
+                formControlName="port"
+                class="form-control"
+              />
+            </div>
+            <div class="col-md-6">
+              <label for="user" class="form-label">Usuario</label>
+              <input
+                id="user"
+                type="text"
+                formControlName="user"
+                class="form-control"
+              />
+            </div>
+            <div class="col-md-6">
+              <label for="pass" class="form-label">Contraseña</label>
+              <input
+                id="pass"
+                type="password"
+                formControlName="pass"
+                placeholder="(opcional)"
+                class="form-control"
+              />
+            </div>
+            <div class="col-12">
+              <label for="dbName" class="form-label"
+                >Nombre de la Base de Datos</label
+              >
+              <input
+                id="dbName"
+                type="text"
+                formControlName="dbName"
+                class="form-control"
+                [class.is-invalid]="
+                  dbForm.get('dbName')?.invalid && dbForm.get('dbName')?.touched
+                "
+              />
+              <div
+                *ngIf="
+                  dbForm.get('dbName')?.invalid && dbForm.get('dbName')?.touched
+                "
+                class="invalid-feedback"
+              >
+                El nombre de la base de datos es requerido.
+              </div>
+            </div>
+          </div>
+
+          <button
+            class="btn btn-primary w-100 mt-4"
+            type="submit"
+            [disabled]="isLoading"
+          >
+            <span
+              *ngIf="isLoading"
+              class="spinner-border spinner-border-sm me-2"
+              role="status"
+              aria-hidden="true"
+            ></span>
+            {{ isLoading ? "Analizando..." : "Analizar Base de Datos" }}
+          </button>
+        </form>
+      </div>
+    </div>
   </section>
 
   <!-- Sección de Resultados -->
@@ -93,6 +140,9 @@
       *ngIf="apiResponse.success; else errorBlock"
       class="alert alert-success"
     >
+      <button class="btn btn-primary float-end" (click)="saveJSON( dbForm.get('dbName')?.value)">
+        Guardar Progreso
+      </button>
       <h4 class="alert-heading">¡Conexión Exitosa!</h4>
       <p>
         Se encontraron <strong>{{ tableNames.length }}</strong> tablas en la
@@ -111,7 +161,7 @@
         <form [formGroup]="selectionForm" class="mt-3">
           <!-- Vista tipo Diagrama Entidad-Relación -->
           <div
-            class="d-flex flex-wrap gap-4 p-4 rounded shadow-inner"
+            class="d-flex justify-content-between flex-wrap gap-4 p-4 rounded shadow-inner"
             style="
               background-color: #f0f2f5;
               border: 1px solid #ddd;
@@ -407,13 +457,12 @@
                 <div class="col-9">
                   <h6>SQL de la consulta</h6>
                   <textarea
-                    class="form-control "
+                    class="form-control"
                     [(ngModel)]="consultaData"
                     rows="9"
                     cols="50"
                     [innerHTML]="consultaData"
                   >
-
                   </textarea>
                 </div>
                 <div class="col-3">
@@ -433,7 +482,7 @@
                       {{ table }}
                     </option>
                   </select>
-                  
+
                   <select
                     name="campo"
                     id="campo"
@@ -453,14 +502,25 @@
                   </select>
                 </div>
               </div>
-              <button class="btn btn-primary" (click)="test()">Vista previa</button>
+              <button class="btn btn-primary" (click)="test()">
+                Vista previa
+              </button>
 
               <!-- Tabla de Resultados de la Consulta -->
               <div class="row mt-4">
                 <div class="col-12">
-                  <div *ngIf="queryError" class="alert alert-danger mb-0">{{ queryError }}</div>
-                  <div *ngIf="queryResults" class="table-responsive border rounded" style="max-height: 300px; overflow-y: auto;">
-                    <table class="table table-sm table-bordered table-striped mb-0" style="font-size: 0.85rem">
+                  <div *ngIf="queryError" class="alert alert-danger mb-0">
+                    {{ queryError }}
+                  </div>
+                  <div
+                    *ngIf="queryResults"
+                    class="table-responsive border rounded"
+                    style="max-height: 300px; overflow-y: auto"
+                  >
+                    <table
+                      class="table table-sm table-bordered table-striped mb-0"
+                      style="font-size: 0.85rem"
+                    >
                       <thead class="table-dark sticky-top">
                         <tr>
                           <th *ngFor="let key of queryKeys">{{ key }}</th>
@@ -471,7 +531,12 @@
                           <td *ngFor="let key of queryKeys">{{ row[key] }}</td>
                         </tr>
                         <tr *ngIf="queryResults.length === 0">
-                          <td [attr.colspan]="queryKeys.length || 1" class="text-center text-muted py-3">0 resultados encontrados</td>
+                          <td
+                            [attr.colspan]="queryKeys.length || 1"
+                            class="text-center text-muted py-3"
+                          >
+                            0 resultados encontrados
+                          </td>
                         </tr>
                       </tbody>
                     </table>
@@ -656,7 +721,37 @@
   <section *ngIf="generatedApiCode" class="generated-api-section mt-4">
     <div class="card">
       <div class="card-header">
-        <h4>API Generada <span (click)="copy()">📄 COPY TO CLIPBOARD</span></h4>
+        <button
+          (click)="copy()"
+          class="btn btn-primary float-end"
+          role="button"
+        >
+          📄 COPY TO CLIPBOARD
+        </button>
+
+        <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+          <div
+            id="liveToast"
+            class="toast hide"
+            role="alert"
+            aria-live="assertive"
+            aria-atomic="true"
+          >
+            <div class="toast-header bg-success text-white">
+              <strong class="me-auto">Copiado</strong>
+              <small>Success</small>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="toast"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="toast-body ">Código copiado correctamente</div>
+          </div>
+        </div>
+
+        <h4>API Generada</h4>
       </div>
       <div class="card-body">
         <pre><code>{{ generatedApiCode }}</code></pre>
