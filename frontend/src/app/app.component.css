@@ -17,7 +17,7 @@ body {
   line-height: 1.5;
 }
 
-.card-body{
+.tablas .card-body{
       max-height: 265px;
     overflow-y: scroll;
 }

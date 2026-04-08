@@ -72,20 +72,36 @@ app.post("/api/test-query", async (req, res) => {
   const { host, port, user, pass, dbName } = dbConfig;
 
   if (!host || !user || !dbName || !sql) {
-    return res.status(400).json({ success: false, message: "Faltan parámetros o consulta." });
+    return res
+      .status(400)
+      .json({ success: false, message: "Faltan parámetros o consulta." });
   }
 
   // Validación simple para prevenir comandos destructivos en la vista previa
   const upperSql = sql.trim().toUpperCase();
-  if (!upperSql.startsWith("SELECT") && !upperSql.startsWith("SHOW") && !upperSql.startsWith("DESCRIBE")) {
-    return res.status(400).json({ success: false, message: "Solo se permiten consultas de lectura (SELECT) para la vista previa." });
+  if (
+    !upperSql.startsWith("SELECT") &&
+    !upperSql.startsWith("SHOW") &&
+    !upperSql.startsWith("DESCRIBE")
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Solo se permiten consultas de lectura (SELECT) para la vista previa.",
+    });
   }
 
   let connection;
   try {
     // 1. Establece la conexión
-    connection = await mysql.createConnection({ host, port: port || 3306, user, password: pass, database: dbName });
-    
+    connection = await mysql.createConnection({
+      host,
+      port: port || 3306,
+      user,
+      password: pass,
+      database: dbName,
+    });
+
     // 2. Ejecuta y devuelve las filas
     const [rows] = await connection.execute(sql);
     res.json({ success: true, rows });
@@ -333,6 +349,7 @@ const dbConfig = {
 async function getConnection() {
   return await mysql.createConnection(dbConfig);
 }
+
 `);
 
   for (const table in tables) {
@@ -463,7 +480,44 @@ app.delete('/api/${table}/:${primaryKey}', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+  /**
+ * @route   GET /api/
+ * @desc    Muestra el listado de Consultas disponibles.
+ * @access  Public
+ */
+app.get("/api", async (req, res) => {
+  res.sendFile("index.html");
+});
+
 `);
+      }
+
+      // Generar endpoints para métodos personalizados (customMethods)
+      const customMethods =
+        operations.customMethods || tableSchema.customMethods;
+      if (customMethods && Array.isArray(customMethods)) {
+        customMethods.forEach((method) => {
+          // Escapamos backticks y símbolos de dólar para evitar errores de sintaxis en el archivo generado
+          const safeQuery = method.query
+            .replace(/`/g, "\\`")
+            .replace(/\$/g, "\\$");
+          code.push(`
+// CUSTOM METHOD: ${method.name}
+app.${method.type}('/api/${table}/custom/${method.name}', async (req, res) => {
+  try {
+    const connection = await getConnection();
+    const [rows] = await connection.execute(\`${safeQuery}\`);
+    await connection.end();
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+        `);
+        });
       }
     }
   }

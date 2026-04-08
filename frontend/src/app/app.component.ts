@@ -30,9 +30,9 @@ export class AppComponent implements OnInit {
 
   //MODAL CONSULTA
   constable: any;
-  conscampoid: any;
-  conscampo: any;
+  nombreConsulta: any;
   consultaData: any = 'SELECT ';
+  tipoConsulta: any = 'get'
   queryResults: any[] | null = null;
   queryError: string | null = null;
   queryKeys: string[] = [];
@@ -128,6 +128,7 @@ CREATE TABLE IF NOT EXISTS users_api (
           create: [true],
           update: [true],
           delete: [true],
+          customMethods: [[]], // <-- Añadimos el control para alojar nuestras consultas
         });
         return acc;
       },
@@ -305,8 +306,7 @@ CREATE TABLE IF NOT EXISTS users_api (
 
   openConsultaModal(tabla: any): void {
     this.constable = tabla;
-    this.conscampoid = '0';
-    this.conscampo = '0';
+    this.nombreConsulta = '';
     this.queryResults = null;
     this.queryError = null;
     this.queryKeys = [];
@@ -421,9 +421,27 @@ CREATE TABLE IF NOT EXISTS users_api (
     }
   }
 
-  relacionar(origen: any, tabla: any, campoid: any, campo: any) {
-    console.log('Relacionando:', origen.Field, 'con', tabla, campo);
+  saveNewMethod(tableName: any, name: any, type: any, query: any) {
+    if (tableName && name && query && name !== '0' && query !== '0') {
+      const tableGroup = this.selectionForm.get(tableName);
+      if (tableGroup) {
+        let customMethods = tableGroup.get('customMethods')?.value;
+        if (!customMethods || !Array.isArray(customMethods)) {
+          customMethods = [];
+        }
+        // Agregamos la consulta al listado de métodos
+        customMethods.push({
+          name: name,
+          type: type,
+          query: query,
+        });
+        // Actualizamos el valor en el formulario
+        tableGroup.get('customMethods')?.setValue(customMethods);
+      }
+    }
+  }
 
+  relacionar(origen: any, tabla: any, campoid: any, campo: any) {
     // Validamos que vengan los datos correctos
     if (origen && tabla && campo && tabla !== '0' && campo !== '0') {
       // Cambiamos el 'Key' para que la UI muestre la etiqueta 'FK' dinámicamente

@@ -5,7 +5,7 @@
 
   <section
     class="form-section w-100 border border-1 p-2 p-md-3 rounded shadow-sm alert alert-success"
-    *ngIf="!apiResponse"
+    *ngIf="!apiResponse?.success"
   >
     <h4>Paso 1:</h4>
     <p>Conéctate a tu base de datos MySQL para analizar su estructura.</p>
@@ -37,7 +37,10 @@
         />
 
         <!-- Botón que hace clic en el input oculto -->
-        <button class="nav-link border border-1 rounded text-black" (click)="fileInput.click()">
+        <button
+          class="nav-link border border-1 rounded text-black"
+          (click)="fileInput.click()"
+        >
           Importar Proyecto
         </button>
       </li>
@@ -140,7 +143,10 @@
       *ngIf="apiResponse.success; else errorBlock"
       class="alert alert-success"
     >
-      <button class="btn btn-primary float-end" (click)="saveJSON( dbForm.get('dbName')?.value)">
+      <button
+        class="btn btn-primary float-end"
+        (click)="saveJSON(dbForm.get('dbName')?.value)"
+      >
         Guardar Progreso
       </button>
       <h4 class="alert-heading">¡Conexión Exitosa!</h4>
@@ -177,7 +183,7 @@
             >
               <!-- Cabecera de la tabla -->
               <div
-                class="card-header bg-primary text-white text-center py-1"
+                class="card-header bg-primary text-white text-center py-1 tablas"
                 style="border-radius: 0; border-bottom: 1px solid #999"
               >
                 <h6 class="m-0 fw-bold">{{ table }}</h6>
@@ -192,7 +198,7 @@
                   <li
                     class="list-group-item d-flex justify-content-between align-items-center px-2 py-1 border-0 border-bottom"
                     style="border-color: #eee !important"
-                    *ngFor="let col of apiResponse.schema?.[table]"
+                    *ngFor="let col of apiResponse.schema?.[table]; index as n"
                   >
                     <span>
                       {{ col.Field }}
@@ -209,10 +215,15 @@
                         }}<span>({{ col.relatedWith.fieldShow }})</span>
                       </small>
                     </span>
-                    <span>
+                    <span class="d-flex gap-1 align-items-center">
+                      <strong
+                        *ngIf="col.Key === 'PRI'"
+                        class="text-dark fst-italic"
+                        >PK</strong
+                      >
                       <button
                         *ngIf="
-                          col.Key != 'PRI' &&
+                          n != 0 &&
                           col.Key != 'MUL' &&
                           col.Key != 'FK' &&
                           col.Type.includes('int')
@@ -226,11 +237,6 @@
                       >
                         +
                       </button>
-                      <strong
-                        *ngIf="col.Key === 'PRI'"
-                        class="text-dark fst-italic"
-                        >PK</strong
-                      >
                       <strong
                         *ngIf="col.Key === 'MUL' || col.Key === 'FK'"
                         class="text-dark"
@@ -290,6 +296,37 @@
                     />
                     <label class="text-muted mt-1">Create()</label>
                   </div>
+
+                  <!-- Métodos personalizados -->
+                  <ng-container
+                    *ngIf="
+                      selectionForm.get(table)?.get('customMethods')?.value
+                        ?.length
+                    "
+                  >
+                    <div
+                      class="form-check p-0 m-0 d-flex gap-2 align-items-center"
+                      *ngFor="
+                        let method of selectionForm
+                          .get(table)
+                          ?.get('customMethods')?.value
+                      "
+                    >
+                      <input
+                        class="form-check-input m-0"
+                        type="checkbox"
+                        checked
+                        disabled
+                      />
+                      <label
+                        class="text-muted mt-1 text-truncate"
+                        style="max-width: 140px"
+                        [title]="method.name"
+                        >{{ method.name }}()</label
+                      >
+                    </div>
+                  </ng-container>
+
                   <div
                     class="form-check p-0 m-0 d-flex gap-2 align-items-center"
                   >
@@ -451,8 +488,27 @@
             </div>
             <div class="modal-body">
               <h6>Nombre del Método</h6>
+              <div class="d-flex gap-2">
+                <input
+                  type="text"
+                  row="10"
+                  class="form-control"
+                  [(ngModel)]="nombreConsulta"
+                />
+                <select
+                  name="type"
+                  id="type"
+                  class="form-select"
+                  aria-label="Default select example"
+                  [(ngModel)]="tipoConsulta"
+                >
+                  <option>get</option>
+                  <option>post</option>
+                  <option>put</option>
+                  <option>delete</option>
+                </select>
+              </div>
 
-              <input type="text" row="10" class="form-control" />
               <div class="row form-group mt-5">
                 <div class="col-9">
                   <h6>SQL de la consulta</h6>
@@ -502,9 +558,7 @@
                   </select>
                 </div>
               </div>
-              <button class="btn btn-primary" (click)="test()">
-                Vista previa
-              </button>
+              <button class="btn btn-primary" (click)="test()">Probar</button>
 
               <!-- Tabla de Resultados de la Consulta -->
               <div class="row mt-4">
@@ -553,10 +607,18 @@
                 Close
               </button>
               <button
+                [disabled]="queryResults == null"
                 type="button"
                 class="btn btn-primary"
                 data-bs-dismiss="modal"
-                (click)="relacionar(relacionarData, Stable, campoid, campo)"
+                (click)="
+                  saveNewMethod(
+                    constable,
+                    nombreConsulta,
+                    tipoConsulta,
+                    consultaData
+                  )
+                "
               >
                 Save changes
               </button>
@@ -729,7 +791,7 @@
           📄 COPY TO CLIPBOARD
         </button>
 
-        <div class="position-fixed top-0 end-0 p-3" style="z-index: 11">
+        <div class="position-fixed top-50 end-50 p-3" style="z-index: 11">
           <div
             id="liveToast"
             class="toast hide"
@@ -747,7 +809,7 @@
                 aria-label="Close"
               ></button>
             </div>
-            <div class="toast-body ">Código copiado correctamente</div>
+            <div class="toast-body">Código copiado correctamente</div>
           </div>
         </div>
 

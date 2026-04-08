@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Réplica de Endpoints de Notion</title>
+    <style>
+      /* --- Estilos Globales --- */
+      :root {
+        --bg-color: #ffffff;
+        --text-primary: #37352f;
+        --text-secondary: #7e7d7a;
+        --border-color: #e9e9e8;
+        --hover-bg: #f7f7f5;
+        --method-post-bg: #e6fcf5;
+        --method-post-text: #0ca678;
+        --method-get-bg: #fff0f6;
+        --method-get-text: #d6336c;
+        --tag-auth-bg: #e6fcf5;
+        --tag-users-bg: #fff4e6;
+        --tag-search-bg: #f1f0ef;
+        --code-inline-bg: #f9f9f9;
+        --code-inline-text: #eb5757;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+          "Segoe UI Symbol";
+        background-color: var(--bg-color);
+        color: var(--text-primary);
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+      }
+
+      /* --- Contenedor Principal (Sombra de ventana) --- */
+      .window-frame {
+        width: 90%;
+        max-width: 1200px;
+        margin: 40px;
+        background: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* --- Barra de título simulada de macOS --- */
+      .window-header {
+        height: 36px;
+        background-color: #ffffff;
+        display: flex;
+        align-items: center;
+        padding-left: 14px;
+        border-bottom: 1px solid transparent;
+      }
+
+      .dots {
+        display: flex;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+      }
+      .dot.red {
+        background-color: #ff5f56;
+      }
+      .dot.yellow {
+        background-color: #ffbd2e;
+      }
+      .dot.green {
+        background-color: #27c93f;
+      }
+
+      /* --- Contenido de Notion --- */
+      .notion-content {
+        padding: 20px 40px;
+      }
+
+      /* --- Encabezado --- */
+      .main-header {
+        margin-bottom: 24px;
+      }
+
+      h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0;
+        padding: 4px 0;
+      }
+
+      .view-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 14px;
+        color: var(--text-primary);
+        padding: 8px 0;
+      }
+
+      .view-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+      }
+
+      .filter-controls {
+        display: flex;
+        gap: 16px;
+        color: var(--text-secondary);
+      }
+
+      .filter-controls span:hover {
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+
+      /* --- Estilos de Tabla y Grupos --- */
+      .endpoints-table {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .group-container {
+        margin-bottom: 24px;
+      }
+
+      .group-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        font-size: 14px;
+      }
+
+      .arrow {
+        font-size: 10px;
+        color: var(--text-secondary);
+        transition: transform 0.2s;
+      }
+
+      .group-name {
+        font-weight: 500;
+        padding: 1px 6px;
+        border-radius: 3px;
+      }
+
+      /* Colores de etiquetas de grupo */
+      .group-name.auth {
+        background-color: var(--tag-auth-bg);
+        color: #099268;
+      }
+      .group-name.users {
+        background-color: var(--tag-users-bg);
+        color: #f76707;
+      }
+      .group-name.search {
+        background-color: var(--tag-search-bg);
+        color: #495057;
+      }
+
+      .group-count {
+        color: var(--text-secondary);
+      }
+
+      /* --- La Tabla Real --- */
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font-size: 14px;
+        color: var(--text-primary);
+      }
+
+      /* Cabecera de la tabla */
+      .table-head {
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border-color);
+      }
+
+      .table-head th {
+        text-align: left;
+        font-weight: 400;
+        padding: 6px 10px;
+        white-space: nowrap;
+      }
+
+      .table-head th svg {
+        vertical-align: middle;
+        width: 16px;
+        height: 16px;
+        margin-right: 6px;
+      }
+
+      /* Filas del cuerpo de la tabla */
+      .table-row {
+        border-top: 1px solid var(--border-color);
+      }
+
+      .table-row:hover {
+        background-color: var(--hover-bg);
+      }
+
+      .table-row td {
+        padding: 10px;
+        vertical-align: top;
+        line-height: 1.5;
+      }
+
+      /* Columnas específicas */
+      .col-icon {
+        width: 20px;
+        text-align: right;
+      }
+      .col-name {
+        width: 180px;
+        font-weight: 600;
+        text-decoration: underline;
+        color: inherit;
+        cursor: pointer;
+      }
+      .col-type {
+        width: 70px;
+      }
+      .col-url {
+        width: 260px;
+        word-break: break-all;
+        color: inherit;
+        text-decoration: none;
+      }
+      .col-desc {
+      }
+
+      /* Icono de enchufe */
+      .plugin-icon {
+        font-size: 14px;
+        color: #ae3ec9;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+
+      /* Etiquetas de método HTTP */
+      .method {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 3px;
+        text-transform: uppercase;
+      }
+      .method.post {
+        background-color: var(--method-post-bg);
+        color: var(--method-post-text);
+      }
+      .method.get {
+        background-color: var(--method-get-bg);
+        color: var(--method-get-text);
+      }
+
+      /* Enlace URL */
+      .url-link {
+        text-decoration: underline;
+        color: inherit;
+      }
+      .url-link:hover {
+        color: #228be6;
+      }
+
+      /* Estilos de código en línea */
+      code {
+        font-family:
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
+          monospace;
+        font-size: 85%;
+        padding: 0.2em 0.4em;
+        border-radius: 3px;
+        color: var(--code-inline-text);
+      }
+      .desc-code {
+        color: #495057;
+      }
+
+      /* Enlaces de descripción */
+      .desc-link {
+        color: #228be6;
+        text-decoration: underline;
+      }
+
+      /* --- Pie de página --- */
+      .footer {
+        padding: 12px 40px 24px 40px;
+        font-size: 14px;
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+      }
+      .footer:hover {
+        background-color: var(--hover-bg);
+        color: var(--text-primary);
+      }
+
+      /* --- SVG Icons --- */
+      .svg-icon {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+        display: inline-block;
+        vertical-align: text-bottom;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window-frame">
+      <div class="window-header">
+        <div class="dots">
+          <div class="dot red"></div>
+          <div class="dot yellow"></div>
+          <div class="dot green"></div>
+        </div>
+      </div>
+
+      <div class="notion-content">
+        <header class="main-header">
+          <h1>Endpoints</h1>
+          <div class="view-controls">
+            <div class="view-name">
+              <svg class="svg-icon" viewBox="0 0 16 16">
+                <path
+                  d="M14 0c1.104 0 2 .896 2 2v12c0 1.104-.896 2-2 2h-12c-1.104 0-2-.896-2-2v-12c0-1.104.896-2 2-2h12zm-2.188 12.188l-.937-.937-1.125 1.125-.937-.937-2.063 2.063.937.937.938-.938 1.125 1.125 2.062-2.063 1.125 1.125.937-.938-2.063-2.062zm-5.125-6l.938.938 1.125-1.125.937.937 2.063-2.062-1.125-1.125.938-.938-2.063 2.063-1.125-1.125-.937.938 2.062 2.062z"
+                  fill="#7E7D7A"></path>
+              </svg>
+              <span>All Endpoints</span>
+            </div>
+            <div class="filter-controls">
+              <span>Filter</span>
+              <span>Sort</span>
+              <svg class="svg-icon" viewBox="0 0 16 16" style="margin-top: 2px">
+                <path
+                  d="M15.111 13.921L11.722 10.531a6.111 6.111 0 10-1.19 1.191l3.389 3.39c.328.328.86.328 1.19 0 .328-.328.328-.86 0-1.191zM2.222 6.667a4.444 4.444 0 118.889 0 4.444 4.444 0 01-8.889 0z"></path>
+              </svg>
+            </div>
+          </div>
+        </header>
+
+        <div class="endpoints-table">
+          <div class="group-container">
+            <div class="group-header">
+              <span class="arrow">▼</span>
+              <span class="group-name auth">Authentication</span>
+              <span class="group-count">1</span>
+            </div>
+
+            <table class="table">
+              <thead class="table-head">
+                <tr>
+                  <th class="col-icon"></th>
+                  <th class="col-name">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M11 2H5V4H11V2ZM11 6H5V8H11V6ZM5 10H11V12H5V10Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Aa Name
+                  </th>
+                  <th class="col-type">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M11.7 4.1C11.3 3.7 10.7 3.5 10 3.5C8.6 3.5 7.5 4.6 7.5 6V7.1C7 6.4 6.2 6 5.2 6C3.1 6 1.5 7.6 1.5 9.7C1.5 11.8 3.1 13.4 5.2 13.4C7.3 13.4 8.9 11.8 8.9 9.7V6C8.9 5.4 9.4 4.9 10 4.9C10.6 4.9 11.1 5.4 11.1 6V10H12.5V6C12.5 5.2 12.2 4.5 11.7 4.1ZM5.2 12.1C3.9 12.1 2.9 11 2.9 9.7C2.9 8.4 3.9 7.3 5.2 7.3C6.5 7.3 7.5 8.4 7.5 9.7C7.5 11 6.5 12.1 5.2 12.1Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Type
+                  </th>
+                  <th class="col-url">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M9.8 4.3C9.8 3.9 9.5 3.5 9.1 3.5H4.1C2.5 3.5 1.1 4.8 1.1 6.5V11.5C1.1 13.1 2.5 14.5 4.1 14.5H9.1C9.5 14.5 9.8 14.1 9.8 13.8V12.4H8.4V13.1H4.1C3.2 13.1 2.5 12.4 2.5 11.5V6.5C2.5 5.6 3.2 4.9 4.1 4.9H9.1V5.7H9.8V4.3ZM14.9 10.9V5.9C14.9 4.3 13.5 2.9 11.9 2.9H6.9C6.5 2.9 6.2 3.2 6.2 3.6V5H7.6V4.3H11.9C12.8 4.3 13.5 5 13.5 5.9V10.9C13.5 11.8 12.8 12.5 11.9 12.5H6.9C6.5 12.5 6.2 12.8 6.2 13.1V14.5V14.5C6.2 14.9 6.5 15.2 6.9 15.2H11.9C13.5 15.2 14.9 13.8 14.9 12.2V10.9Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    URL
+                  </th>
+                  <th class="col-desc">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M2.5 4H13.5V5.5H2.5V4ZM2.5 7.25H13.5V8.75H2.5V7.25ZM2.5 10.5H13.5V12H2.5V10.5Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row">
+                  <td><span class="plugin-icon">🔌</span></td>
+                  <td><a href="#" class="col-name">Create a token</a></td>
+                  <td><span class="method post">POST</span></td>
+                  <td>
+                    <a href="#" class="url-link"
+                      >https://api.notion.com/v1/oauth/token</a
+                    >
+                  </td>
+                  <td>
+                    Creates an access token that a third-party service can use
+                    to authenticate with Notion.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="group-container">
+            <div class="group-header">
+              <span class="arrow">▼</span>
+              <span class="group-name users">Users</span>
+              <span class="group-count">3</span>
+            </div>
+
+            <table class="table">
+              <thead class="table-head">
+                <tr>
+                  <th class="col-icon"></th>
+                  <th class="col-name">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M11 2H5V4H11V2ZM11 6H5V8H11V6ZM5 10H11V12H5V10Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Aa Name
+                  </th>
+                  <th class="col-type">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M11.7 4.1C11.3 3.7 10.7 3.5 10 3.5C8.6 3.5 7.5 4.6 7.5 6V7.1C7 6.4 6.2 6 5.2 6C3.1 6 1.5 7.6 1.5 9.7C1.5 11.8 3.1 13.4 5.2 13.4C7.3 13.4 8.9 11.8 8.9 9.7V6C8.9 5.4 9.4 4.9 10 4.9C10.6 4.9 11.1 5.4 11.1 6V10H12.5V6C12.5 5.2 12.2 4.5 11.7 4.1ZM5.2 12.1C3.9 12.1 2.9 11 2.9 9.7C2.9 8.4 3.9 7.3 5.2 7.3C6.5 7.3 7.5 8.4 7.5 9.7C7.5 11 6.5 12.1 5.2 12.1Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Type
+                  </th>
+                  <th class="col-url">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M9.8 4.3C9.8 3.9 9.5 3.5 9.1 3.5H4.1C2.5 3.5 1.1 4.8 1.1 6.5V11.5C1.1 13.1 2.5 14.5 4.1 14.5H9.1C9.5 14.5 9.8 14.1 9.8 13.8V12.4H8.4V13.1H4.1C3.2 13.1 2.5 12.4 2.5 11.5V6.5C2.5 5.6 3.2 4.9 4.1 4.9H9.1V5.7H9.8V4.3ZM14.9 10.9V5.9C14.9 4.3 13.5 2.9 11.9 2.9H6.9C6.5 2.9 6.2 3.6 6.2 3.6V5H7.6V4.3H11.9C12.8 4.3 13.5 5 13.5 5.9V10.9C13.5 11.8 12.8 12.5 11.9 12.5H6.9C6.5 12.5 6.2 12.8 6.2 13.1V14.5V14.5C6.2 14.9 6.5 15.2 6.9 15.2H11.9C13.5 15.2 14.9 13.8 14.9 12.2V10.9Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    URL
+                  </th>
+                  <th class="col-desc">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M2.5 4H13.5V5.5H2.5V4ZM2.5 7.25H13.5V8.75H2.5V7.25ZM2.5 10.5H13.5V12H2.5V10.5Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row">
+                  <td><span class="plugin-icon">🔌</span></td>
+                  <td><a href="#" class="col-name">List all users</a></td>
+                  <td><span class="method get">GET</span></td>
+                  <td>
+                    <a href="#" class="url-link"
+                      >https://api.notion.com/v1/users</a
+                    >
+                  </td>
+                  <td>
+                    Returns a paginated list of Users for the workspace. The
+                    response may contain fewer than <code>page_size</code> of
+                    results.
+                  </td>
+                </tr>
+                <tr class="table-row">
+                  <td><span class="plugin-icon">🔌</span></td>
+                  <td><a href="#" class="col-name">Retrieve a user</a></td>
+                  <td><span class="method get">GET</span></td>
+                  <td>
+                    <a href="#" class="url-link"
+                      >https://api.notion.com/v1/users/{user_id}</a
+                    >
+                  </td>
+                  <td>
+                    Retrieves a <a href="#" class="desc-link">User</a> using the
+                    ID specified.
+                  </td>
+                </tr>
+                <tr class="table-row">
+                  <td><span class="plugin-icon">🔌</span></td>
+                  <td>
+                    <a href="#" class="col-name"
+                      >Retrieve your token's bot user</a
+                    >
+                  </td>
+                  <td><span class="method get">GET</span></td>
+                  <td>
+                    <a href="#" class="url-link"
+                      >https://api.notion.com/v1/users/me</a
+                    >
+                  </td>
+                  <td>
+                    Retrieves the bot User associated with the API token
+                    provided in the authorization header. The bot will have an
+                    <code>owner</code> field with information about the person
+                    who authorized the integration.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="group-container">
+            <div class="group-header">
+              <span class="arrow">▼</span>
+              <span class="group-name search">Search</span>
+              <span class="group-count">1</span>
+            </div>
+
+            <table class="table">
+              <thead class="table-head">
+                <tr>
+                  <th class="col-icon"></th>
+                  <th class="col-name">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M11 2H5V4H11V2ZM11 6H5V8H11V6ZM5 10H11V12H5V10Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Aa Name
+                  </th>
+                  <th class="col-type">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M11.7 4.1C11.3 3.7 10.7 3.5 10 3.5C8.6 3.5 7.5 4.6 7.5 6V7.1C7 6.4 6.2 6 5.2 6C3.1 6 1.5 7.6 1.5 9.7C1.5 11.8 3.1 13.4 5.2 13.4C7.3 13.4 8.9 11.8 8.9 9.7V6C8.9 5.4 9.4 4.9 10 4.9C10.6 4.9 11.1 5.4 11.1 6V10H12.5V6C12.5 5.2 12.2 4.5 11.7 4.1ZM5.2 12.1C3.9 12.1 2.9 11 2.9 9.7C2.9 8.4 3.9 7.3 5.2 7.3C6.5 7.3 7.5 8.4 7.5 9.7C7.5 11 6.5 12.1 5.2 12.1Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Type
+                  </th>
+                  <th class="col-url">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M9.8 4.3C9.8 3.9 9.5 3.5 9.1 3.5H4.1C2.5 3.5 1.1 4.8 1.1 6.5V11.5C1.1 13.1 2.5 14.5 4.1 14.5H9.1C9.5 14.5 9.8 14.1 9.8 13.8V12.4H8.4V13.1H4.1C3.2 13.1 2.5 12.4 2.5 11.5V6.5C2.5 5.6 3.2 4.9 4.1 4.9H9.1V5.7H9.8V4.3ZM14.9 10.9V5.9C14.9 4.3 13.5 2.9 11.9 2.9H6.9C6.5 2.9 6.2 3.6 6.2 3.6V5H7.6V4.3H11.9C12.8 4.3 13.5 5 13.5 5.9V10.9C13.5 11.8 12.8 12.5 11.9 12.5H6.9C6.5 12.5 6.2 12.8 6.2 13.1V14.5V14.5C6.2 14.9 6.5 15.2 6.9 15.2H11.9C13.5 15.2 14.9 13.8 14.9 12.2V10.9Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    URL
+                  </th>
+                  <th class="col-desc">
+                    <svg viewBox="0 0 16 16">
+                      <path
+                        d="M2.5 4H13.5V5.5H2.5V4ZM2.5 7.25H13.5V8.75H2.5V7.25ZM2.5 10.5H13.5V12H2.5V10.5Z"
+                        fill="currentColor"></path>
+                    </svg>
+                    Description
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row">
+                  <td><span class="plugin-icon">🔌</span></td>
+                  <td><a href="#" class="col-name">Search by title</a></td>
+                  <td><span class="method post">POST</span></td>
+                  <td>
+                    <a href="#" class="url-link"
+                      >https://api.notion.com/v1/search</a
+                    >
+                  </td>
+                  <td>
+                    Searches all parent or child pages and databases that have
+                    been shared with an integration.<br />
+                    Returns all <a href="#" class="desc-link">pages</a> or
+                    <a href="#" class="desc-link">databases</a>, excluding
+                    duplicated linked databases, that have titles that include
+                    the <code>query</code> param. If no <code>query</code> param
+                    is provided, then the response contains all pages or
+                    databases that have been shared with the integration.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="footer">
+        <span
+          class="arrow"
+          style="
+            transform: rotate(-90deg);
+            transform-origin: center;
+            display: inline-block;
+          "
+          >▼</span
+        >
+        <span>1 hidden group</span>
+      </div>
+    </div>
+  </body>
+</html>
