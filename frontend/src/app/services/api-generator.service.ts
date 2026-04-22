@@ -74,13 +74,25 @@ export class ApiGeneratorService {
     dbConfig: DbCredentials;
     username: string;
     password: string;
+    role: string;
   }): Observable<any> {
     return this.http
       .post<any>(`${this.apiUrl}/create-api-user`, payload)
       .pipe(catchError(this.handleError));
   }
 
-  
+  updateApiUser(payload: {
+    dbConfig: DbCredentials;
+    id: number;
+    username: string;
+    password?: string;
+    role: string;
+  }): Observable<any> {
+    return this.http
+      .post<any>(`${this.apiUrl}/update-api-user`, payload)
+      .pipe(catchError(this.handleError));
+  }
+
   testQuery(payload: { dbConfig: DbCredentials; sql: string }): Observable<any> {
     return this.http
       .post<any>(`${this.apiUrl}/test-query`, payload)

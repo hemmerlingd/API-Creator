@@ -1,27 +1,37 @@
-# Frontend
+# API Creator - Frontend (Angular)
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 16.1.0.
+Interfaz de usuario interactiva construida con Angular para configurar, probar y descargar proyectos de API generados dinámicamente.
 
-## Development server
+## Flujo de Trabajo
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+La interfaz guía al usuario a través de 4 pasos fundamentales:
 
-## Code scaffolding
+1. **Conexión:** Configuración de credenciales MySQL y análisis de esquema.
+2. **Configuración CRUD:** Selección de tablas, métodos y creación de consultas SQL personalizadas.
+3. **Gestión de Usuarios:** Administración de acceso y roles para la futura API.
+4. **Generación:** Vista previa del código y descarga del proyecto en formato `.ZIP`.
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+## Funcionalidades Destacadas
 
-## Build
+- **Editor SQL Integrado:** Permite escribir y probar consultas personalizadas con previsualización de datos.
+- **Gestor de Relaciones:** Herramienta visual para definir relaciones entre tablas (Joins).
+- **Importación/Exportación:** Guarda el progreso de tu configuración en archivos JSON para continuar más tarde.
+- **ZIP Bundler:** Genera y empaqueta automáticamente `index.js`, `package.json`, `docs.html` y `.env`.
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+## Instalación y Ejecución
 
-## Running unit tests
+```bash
+# Instalar dependencias
+npm install
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+# Iniciar servidor de desarrollo (Puerto 4200)
+npm start
+```
 
-## Running end-to-end tests
+## Tecnologías Utilizadas
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
-
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+- **Angular 19:** Framework principal.
+- **Bootstrap 5:** Estructura y diseño responsivo.
+- **JSZip:** Generación de archivos comprimidos en el cliente.
+- **FileSaver:** Gestión de descargas de archivos.
+- **RxJS:** Manejo de flujos de datos asíncronos.

@@ -46,6 +46,9 @@ app.post("/api/execute-sql", async (req, res) => {
       user: user,
       password: pass,
       database: dbName,
+      ssl: {
+        rejectUnauthorized: false 
+      }
     });
 
     await connection.query(sql); // Usamos query para poder ejecutar sentencias como CREATE TABLE
@@ -119,37 +122,28 @@ app.post("/api/test-query", async (req, res) => {
  * @access  Public
  */
 app.post("/api/create-api-user", async (req, res) => {
-  const { dbConfig, username, password } = req.body;
+  const { dbConfig, username, password, role } = req.body;
   const { host, port, user, pass, dbName } = dbConfig;
 
-  // Validación básica de entrada
-  if (!host || !user || !dbName) {
+  if (!host || !user || !dbName || !username || !password) {
     return res.status(400).json({
       success: false,
-      message: "Los campos host, user y dbName son obligatorios.",
-    });
-  }
-
-  if (!dbConfig || !username || !password) {
-    return res.status(400).json({
-      success: false,
-      message: "dbConfig, username y password son requeridos.",
+      message: "Faltan parámetros obligatorios.",
     });
   }
 
   let connection;
   try {
-    // 1. Intenta establecer la conexión con la base de datos del usuario
     connection = await mysql.createConnection({
-      host: host,
+      host,
       port: port || 3306,
-      user: user,
+      user,
       password: pass,
       database: dbName,
     });
 
     const [existingUser] = await connection.execute(
-      "SELECT id FROM users_API WHERE username = ?",
+      "SELECT id FROM users_api WHERE username = ?",
       [username],
     );
     if (existingUser.length > 0) {
@@ -163,8 +157,8 @@ app.post("/api/create-api-user", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     const [result] = await connection.execute(
-      "INSERT INTO users_API (username, password) VALUES (?, ?)",
-      [username, hashedPassword],
+      "INSERT INTO users_api (username, password, role) VALUES (?, ?, ?)",
+      [username, hashedPassword, role || "lector"],
     );
 
     res.status(201).json({
@@ -176,7 +170,64 @@ app.post("/api/create-api-user", async (req, res) => {
     console.error(`[ERROR] Creando usuario de API:`, error.message);
     res.status(500).json({
       success: false,
-      message: "Error al crear el usuario de API. ¿La tabla `users` existe?",
+      message: "Error al crear el usuario de API.",
+      error: error.message,
+    });
+  } finally {
+    if (connection) await connection.end();
+  }
+});
+
+/**
+ * @route   POST /api/update-api-user
+ * @desc    Actualiza un usuario existente en la tabla `users_api`.
+ * @access  Public
+ */
+app.post("/api/update-api-user", async (req, res) => {
+  const { dbConfig, id, username, password, role } = req.body;
+  const { host, port, user, pass, dbName } = dbConfig;
+
+  if (!host || !user || !dbName || !id || !username) {
+    return res.status(400).json({
+      success: false,
+      message: "Faltan campos obligatorios.",
+    });
+  }
+
+  let connection;
+  try {
+    connection = await mysql.createConnection({
+      host,
+      port: port || 3306,
+      user,
+      password: pass,
+      database: dbName,
+    });
+
+    let sql = "UPDATE users_api SET username = ?, role = ?";
+    let params = [username, role || "lector"];
+
+    if (password && password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      sql += ", password = ?";
+      params.push(hashedPassword);
+    }
+
+    sql += " WHERE id = ?";
+    params.push(id);
+
+    await connection.execute(sql, params);
+
+    res.json({
+      success: true,
+      message: "Usuario actualizado exitosamente.",
+    });
+  } catch (error) {
+    console.error(`[ERROR] Actualizando usuario:`, error.message);
+    res.status(500).json({
+      success: false,
+      message: "Error al actualizar el usuario.",
       error: error.message,
     });
   } finally {
@@ -193,42 +244,33 @@ app.post("/api/get-api-users", async (req, res) => {
   const { dbConfig } = req.body;
   const { host, port, user, pass, dbName } = dbConfig;
 
-  // Validación básica de entrada
   if (!host || !user || !dbName) {
     return res.status(400).json({
       success: false,
-      message: "Los campos host, user y dbName son obligatorios.",
+      message: "Faltan credenciales de base de datos.",
     });
-  }
-  if (!dbConfig) {
-    return res
-      .status(400)
-      .json({ success: false, message: "dbConfig es requerido." });
   }
 
   let connection;
   try {
-    // 1. Intenta establecer la conexión con la base de datos del usuario
     connection = await mysql.createConnection({
-      host: host,
+      host,
       port: port || 3306,
-      user: user,
+      user,
       password: pass,
       database: dbName,
     });
     const [users] = await connection.execute(
-      "SELECT id, username, created_at FROM users_API",
+      "SELECT id, username, role, created_at FROM users_api",
     );
     res.json({ success: true, users: users });
   } catch (error) {
-    // No es un error crítico si la tabla aún no existe.
     if (error.code === "ER_NO_SUCH_TABLE") {
       res.json({ success: true, users: [] });
     } else {
-      console.error(`[ERROR] Obteniendo usuarios de API:`, error.message);
       res.status(500).json({
         success: false,
-        message: "Error al obtener los usuarios de API.",
+        message: "Error al obtener los usuarios.",
         error: error.message,
       });
     }
@@ -327,28 +369,89 @@ app.post("/api/generate-api", (req, res) => {
 
 function generateApiCode(tables, schema, dbConfig) {
   const code = [];
+
+  // Helper para formatear los roles como strings para authorizeRoles
+  const formatRoles = (roles) => {
+    if (!roles || !Array.isArray(roles) || roles.length === 0) return "'admin'";
+    return roles.map((r) => `'${r}'`).join(", ");
+  };
+
   code.push(`
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const path = require('path');
 
 const app = express();
-const port = 3002;
+const port = process.env.PORT || 3002;
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 
 app.use(cors());
 app.use(express.json());
 
 const dbConfig = {
-  host: "${dbConfig.host}",
-  port: ${dbConfig.port},
-  user: "${dbConfig.user}",
-  password: "${dbConfig.pass}",
-  database: "${dbConfig.dbName}"
+  host: process.env.DB_HOST || "${dbConfig.host}",
+  port: process.env.DB_PORT || ${dbConfig.port},
+  user: process.env.DB_USER || "${dbConfig.user}",
+  password: process.env.DB_PASS || "${dbConfig.pass}",
+  database: process.env.DB_NAME || "${dbConfig.dbName}",
+  ssl: {
+    rejectUnauthorized: false 
+  }
 };
 
 async function getConnection() {
   return await mysql.createConnection(dbConfig);
 }
+
+// --- Middlewares de Seguridad ---
+
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ message: 'Token de autenticación requerido.' });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ message: 'Token inválido o expirado.' });
+    req.user = user;
+    next();
+  });
+};
+
+const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'Acceso denegado: permisos insuficientes.' });
+    }
+    next();
+  };
+};
+
+// --- Ruta de Login ---
+
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const connection = await getConnection();
+    const [rows] = await connection.execute('SELECT * FROM users_api WHERE username = ?', [username]);
+    await connection.end();
+
+    if (rows.length === 0) return res.status(401).json({ message: 'Usuario no encontrado.' });
+
+    const user = rows[0];
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(401).json({ message: 'Contraseña incorrecta.' });
+
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
+    res.json({ success: true, token, role: user.role });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 `);
 
@@ -386,10 +489,21 @@ async function getConnection() {
       const selectString = selectFields.join(", ");
       const fromString = `\`${table}\` ${joinClauses.join(" ")}`.trim();
 
+      // --- READ (GET) ---
       if (operations.read) {
+        const roles =
+          table.toLowerCase() === "users_api" ||
+          table.toLowerCase() === "user_api"
+            ? "'admin'"
+            : formatRoles(operations.readRoles || ["admin", "editor", "lector"]);
+        // Solo READ puede ser público
+        const authMiddleware =
+          operations.isPublicRead && table.toLowerCase() !== "users_api"
+            ? ""
+            : `authenticateToken, authorizeRoles(${roles}), `;
         code.push(`
 // GET all ${table}
-app.get('/api/${table}', async (req, res) => {
+app.get('/api/${table}', ${authMiddleware}async (req, res) => {
   try {
     const connection = await getConnection();
     const [rows] = await connection.execute('SELECT ${selectString} FROM ${fromString}');
@@ -401,7 +515,7 @@ app.get('/api/${table}', async (req, res) => {
 });
 
 // GET ${table} by ${primaryKey}
-app.get('/api/${table}/:${primaryKey}', async (req, res) => {
+app.get('/api/${table}/:${primaryKey}', ${authMiddleware}async (req, res) => {
   try {
     const connection = await getConnection();
     const [rows] = await connection.execute('SELECT ${selectString} FROM ${fromString} WHERE \`${table}\`.\`${primaryKey}\` = ?', [req.params.${primaryKey}]);
@@ -418,18 +532,36 @@ app.get('/api/${table}/:${primaryKey}', async (req, res) => {
 `);
       }
 
+      // --- CREATE (POST) ---
       if (operations.create) {
         const columns = tableSchema
           .map((col) => col.Field)
           .filter((col) => col !== primaryKey);
         const placeholders = columns.map(() => "?").join(", ");
         const columnNames = columns.map((col) => `\`${col}\``).join(", ");
+        const roles =
+          table.toLowerCase() === "users_api" ||
+          table.toLowerCase() === "user_api"
+            ? "'admin'"
+            : formatRoles(operations.createRoles || ["admin", "editor"]);
+
         code.push(`
 // CREATE ${table}
-app.post('/api/${table}', async (req, res) => {
+app.post('/api/${table}', authenticateToken, authorizeRoles(${roles}), async (req, res) => {
   try {
     const connection = await getConnection();
-    const { ${columns.join(", ")} } = req.body;
+    let { ${columns.join(", ")} } = req.body;
+    ${
+      (table.toLowerCase() === "users_api" ||
+        table.toLowerCase() === "user_api") &&
+      columns.includes("password")
+        ? `
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      password = await bcrypt.hash(password, salt);
+    }`
+        : ""
+    }
     const [result] = await connection.execute(
       'INSERT INTO \`${table}\` (${columnNames}) VALUES (${placeholders})',
       [${columns.join(", ")}]
@@ -443,17 +575,35 @@ app.post('/api/${table}', async (req, res) => {
 `);
       }
 
+      // --- UPDATE (PUT) ---
       if (operations.update) {
         const columns = tableSchema
           .map((col) => col.Field)
           .filter((col) => col !== primaryKey);
         const setClause = columns.map((col) => `\`${col}\` = ?`).join(", ");
+        const roles =
+          table.toLowerCase() === "users_api" ||
+          table.toLowerCase() === "user_api"
+            ? "'admin'"
+            : formatRoles(operations.updateRoles || ["admin", "editor"]);
+
         code.push(`
 // UPDATE ${table}
-app.put('/api/${table}/:${primaryKey}', async (req, res) => {
+app.put('/api/${table}/:${primaryKey}', authenticateToken, authorizeRoles(${roles}), async (req, res) => {
   try {
     const connection = await getConnection();
-    const { ${columns.join(", ")} } = req.body;
+    let { ${columns.join(", ")} } = req.body;
+    ${
+      (table.toLowerCase() === "users_api" ||
+        table.toLowerCase() === "user_api") &&
+      columns.includes("password")
+        ? `
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      password = await bcrypt.hash(password, salt);
+    }`
+        : ""
+    }
     await connection.execute(
       'UPDATE \`${table}\` SET ${setClause} WHERE \`${primaryKey}\` = ?',
       [${columns.join(", ")}, req.params.${primaryKey}]
@@ -467,10 +617,17 @@ app.put('/api/${table}/:${primaryKey}', async (req, res) => {
 `);
       }
 
+      // --- DELETE ---
       if (operations.delete) {
+        const roles =
+          table.toLowerCase() === "users_api" ||
+          table.toLowerCase() === "user_api"
+            ? "'admin'"
+            : formatRoles(operations.deleteRoles || ["admin"]);
+
         code.push(`
 // DELETE ${table}
-app.delete('/api/${table}/:${primaryKey}', async (req, res) => {
+app.delete('/api/${table}/:${primaryKey}', authenticateToken, authorizeRoles(${roles}), async (req, res) => {
   try {
     const connection = await getConnection();
     await connection.execute('DELETE FROM \`${table}\` WHERE \`${primaryKey}\` = ?', [req.params.${primaryKey}]);
@@ -480,16 +637,6 @@ app.delete('/api/${table}/:${primaryKey}', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-  /**
- * @route   GET /api/
- * @desc    Muestra el listado de Consultas disponibles.
- * @access  Public
- */
-app.get("/api", async (req, res) => {
-  res.sendFile("index.html");
-});
-
 `);
       }
 
@@ -502,9 +649,27 @@ app.get("/api", async (req, res) => {
           const safeQuery = method.query
             .replace(/`/g, "\\`")
             .replace(/\$/g, "\\$");
+
+          const type = (method.type || "get").toLowerCase();
+          // Si es un método de escritura (no GET), forzamos autenticación independientemente de isPublic
+          const isMutate = type !== "get";
+          const roles = formatRoles(
+            method.roles ||
+              (type === "get"
+                ? ["admin", "editor", "lector"]
+                : type === "delete"
+                  ? ["admin"]
+                  : ["admin", "editor"]),
+          );
+
+          const authMiddleware =
+            method.isPublic && !isMutate
+              ? ""
+              : `authenticateToken, authorizeRoles(${roles}), `;
+
           code.push(`
 // CUSTOM METHOD: ${method.name}
-app.${method.type}('/api/${table}/custom/${method.name}', async (req, res) => {
+app.${method.type}('/api/${table}/custom/${method.name}', ${authMiddleware}async (req, res) => {
   try {
     const connection = await getConnection();
     const [rows] = await connection.execute(\`${safeQuery}\`);
@@ -523,6 +688,16 @@ app.${method.type}('/api/${table}/custom/${method.name}', async (req, res) => {
   }
 
   code.push(`
+app.get('/', (req, res) => {
+  res.redirect('/api');
+});
+
+app.get('/api', (req, res) => {
+  res.sendFile(path.join(__dirname, 'docs.html'));
+});
+`);
+
+  code.push(`
 app.listen(port, () => {
   console.log(\`Generated API server listening at http://localhost:\${port}\`);
 });
@@ -530,6 +705,7 @@ app.listen(port, () => {
 
   return code.join("");
 }
+
 // --- Iniciar el servidor ---
 app.listen(PORT, () => {
   console.log(`Backend server está escuchando en http://localhost:${PORT}`);
