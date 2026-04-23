@@ -14,6 +14,14 @@ app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
+app.get('/api', (req, res) => {
+  res.json({
+    mensaje: "Hola mundo",
+    estado: "online",
+    servidor: "Vercel Serverless"
+  });
+});
+
 /**
  * @route   POST /api/execute-sql
  * @desc    Ejecuta un comando SQL en la base de datos del usuario.
