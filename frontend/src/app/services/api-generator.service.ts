@@ -28,7 +28,7 @@ export interface Progreso {
   providedIn: 'root',
 })
 export class ApiGeneratorService {
-  private readonly apiUrl = 'http://localhost:3001/api';
+  private readonly apiUrl = '/api';
 
   constructor(private http: HttpClient) {}
 
