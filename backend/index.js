@@ -710,3 +710,4 @@ app.listen(port, () => {
 app.listen(PORT, () => {
   console.log(`Backend server está escuchando en http://localhost:${PORT}`);
 });
+module.exports = app;
