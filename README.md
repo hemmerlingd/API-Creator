@@ -60,3 +60,4 @@ El proyecto se divide en dos componentes principales:
 - **Backend:** Node.js, Express, Mysql2, Bcryptjs, Cors.
 - **Frontend:** Angular, Bootstrap 5, JSZip, FileSaver.
 - **Base de Datos:** Requiere una tabla `users_api` para el funcionamiento del sistema de autenticación generado.
+  <!-- [DEMO_READY] -->
